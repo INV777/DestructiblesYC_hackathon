@@ -31,7 +31,10 @@ output: 0.0
 crustdata:
   base_url: https://api.crustdata.com
   api_version: "2025-11-01"
-  inr_per_credit: 0.0       # TODO: your plan's price per credit
+  # Crustdata credits cost USD 0.30 down to 0.01 depending on plan (crustdata.com pricing pages).
+  # Placeholder: volume tier USD 0.01 x 93.3461 = INR 0.93. REPLACE with your plan's price.
+  # At USD 0.30 a line costs ~INR 33 (1.2 credits), so raise limits.max_cost_inr and the price too.
+  inr_per_credit: 0.93
 
 sources:
   # Order in which payee sources are tried. "fake" is for tests only.
