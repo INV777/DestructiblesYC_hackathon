@@ -261,3 +261,55 @@ class RulesDecider:
                 f"Posted to {name} because {kw_text}.")
         return Decision(status=Status.VERIFIED, payee=h["legal_name"], account_code=code, account_name=name,
                         explanation=expl, citations=cites)
+
+
+# ---- settlement: approvals + exactly-once payment / release ----------------------
+def settle_run(runner: Runner, provider, ask=None, approver: str | None = None) -> dict[str, int]:
+    """Pay approved invoices and post approved duplicate releases. `ask(card) -> (yes, reason)`
+    is called for pending actions when a person is at the terminal; otherwise they wait."""
+    from . import approvals
+    from .payments import settle
+
+    store, cfg, run_id = runner.store, runner.cfg, runner.run_id
+    counts = {"paid": 0, "released": 0, "waiting": 0, "rejected": 0}
+    if ask and approver:
+        for p in approvals.pending_actions(store, cfg, run_id):
+            if any(h["approver"] == approver for h in p["have"]):
+                continue
+            yes, reason = ask(approvals.decision_card(p))
+            approvals.record(store, run_id, p["item"]["item_key"], p["action"], approver, yes, reason)
+
+    for it in store.items(run_id):
+        raw = json.loads(it["raw_json"])
+        amount = float(raw.get("amount_inr", raw.get("amount", 0)))
+        key = it["item_key"]
+        if it["kind"] == "invoice" and it["status"] == "VERIFIED":
+            st, _ = approvals.state(store, cfg, run_id, key, "PAY", amount)
+            if st == "APPROVED":
+                notes = {"run_id": run_id, "line": str(it["line_no"]), "invoice_no": str(raw.get("invoice_no", "")),
+                         "vendor_id": str(raw.get("vendor_id", ""))}
+                settle(store, runner.ledger, provider, cfg, run_id, key, int(round(amount * 100)), notes)
+                counts["paid"] += 1
+            else:
+                counts["waiting" if st == "PENDING" else "rejected"] += 1
+        elif it["status"] == "HELD_DUPLICATE":
+            st, rows = approvals.state(store, cfg, run_id, key, "RELEASE_HOLD", amount)
+            if st == "APPROVED":
+                dec = json.loads(it["decision_json"])
+                orig = store.one("SELECT decision_json FROM items WHERE run_id=? AND line_no=?",
+                                 (run_id, dec.get("related_line")))
+                od = json.loads(orig["decision_json"]) if orig and orig["decision_json"] else {}
+                if od.get("status") == "VERIFIED":
+                    entry_id = sha256(f"{run_id}|{key}|release")[:32]
+                    with store.tx() as c:
+                        c.execute("INSERT OR IGNORE INTO journal (run_id, entry_id, item_key, line_no, date, account_code,"
+                                  " account_name, payee, amount_paise, posted_at) VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))",
+                                  (run_id, entry_id, key, it["line_no"], raw.get("date"), od["account_code"],
+                                   od["account_name"], od["payee"], int(round(amount * 100))))
+                    counts["released"] += 1
+            elif st == "PENDING":
+                counts["waiting"] += 1
+            else:
+                counts["rejected"] += 1
+    store.export_ledger_jsonl(run_id, runner.ledger_path())
+    return counts

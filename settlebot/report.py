@@ -13,6 +13,12 @@ def build_report(store: Store, run_id: str) -> dict[str, Any]:
     if run is None:
         raise SystemExit(f"no run with id '{run_id}'")
     posted = {r["item_key"]: dict(r) for r in store.q("SELECT * FROM journal WHERE run_id=?", (run_id,))}
+    paid = {r["item_key"]: dict(r) for r in store.q("SELECT * FROM payments WHERE run_id=?", (run_id,))}
+    appr: dict[str, list] = {}
+    for r in store.q("SELECT * FROM approvals WHERE run_id=? ORDER BY decided_at", (run_id,)):
+        appr.setdefault(r["item_key"], []).append({"action": r["action"], "approver": r["approver"],
+                                                   "decision": r["decision"], "reason": r["reason"],
+                                                   "decided_at": r["decided_at"]})
     rows = []
     for it in store.items(run_id):
         raw = json.loads(it["raw_json"])
@@ -31,6 +37,9 @@ def build_report(store: Store, run_id: str) -> dict[str, Any]:
             "related_line": dec.get("related_line"),
             "citations": dec.get("citations", []),
             "posted_entry": posted.get(it["item_key"], {}).get("entry_id"),
+            "approvals": appr.get(it["item_key"], []),
+            "payment": ({k: paid[it["item_key"]][k] for k in ("status", "provider", "provider_id", "receipt")}
+                        if it["item_key"] in paid else None),
         })
     cost = store.total_cost(run_id)
     calls = store.one("SELECT COUNT(*) AS n, SUM(cache_hit) AS c FROM ledger WHERE run_id=?", (run_id,))
@@ -68,6 +77,8 @@ def print_report(report: dict[str, Any]) -> None:
             what = f"possible duplicate of line {r['related_line']}"
         elif r["status"] == "CANNOT_VERIFY":
             what = "cannot verify: " + "; ".join(r["missing"][:1])
+        if r.get("payment"):
+            what += f"  [paid {r['payment']['provider_id']}]"
         print(f"{r['line']:>3}  {str(r['date']):<11} {str(r['description'])[:24]:<24} "
               f"{float(r['amount_inr']):>12,.2f}  {r['status']:<15} {what[:60]}")
     print("-" * 110)
