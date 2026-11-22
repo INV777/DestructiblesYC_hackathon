@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 SEARCH = {"success": True, "timestamp": 1795346060311, "results": [
     {"title": "Contact us", "url": "https://www.grab.com/my/legal/",
-     "snippet": "Services in Malaysia are provided by GrabPay Malaysia Sdn Bhd, a licensed e-money issuer."},
+     "snippet": "Services in Malaysia are provided by GrabPay Malaysia Berhad, a licensed e-money issuer."},
 ]}
 
 
@@ -43,40 +43,40 @@ def setup(tmp_path, monkeypatch):
 def test_valid_claude_proposal_is_accepted(setup):
     answers, run = setup
     answers += [
-        {"found": True, "result_index": 0, "field": "snippet", "legal_name": "GrabPay Malaysia Sdn Bhd",
-         "quote": "provided by GrabPay Malaysia Sdn Bhd", "reason": "states the provider"},
+        {"found": True, "result_index": 0, "field": "snippet", "legal_name": "GrabPay Malaysia Berhad",
+         "quote": "provided by GrabPay Malaysia Berhad", "reason": "states the provider"},
         {"account_code": "6430", "reason": "payment app subscription"},
     ]
     line = run()
-    assert line["status"] == "VERIFIED" and line["payee"] == "GrabPay Malaysia Sdn Bhd"
+    assert line["status"] == "VERIFIED" and line["payee"] == "GrabPay Malaysia Berhad"
     assert line["account"] == "6430 Software subscriptions"
-    assert line["citations"][0]["field_or_passage"] == "provided by GrabPay Malaysia Sdn Bhd"
+    assert line["citations"][0]["field_or_passage"] == "provided by GrabPay Malaysia Berhad"
 
 
 def test_quote_not_in_source_is_rejected(setup):
     answers, run = setup
-    answers += [{"found": True, "result_index": 0, "field": "snippet", "legal_name": "GrabPay Malaysia Sdn Bhd",
-                 "quote": "GrabPay Malaysia Sdn Bhd is the merchant of record", "reason": "made up"}]
+    answers += [{"found": True, "result_index": 0, "field": "snippet", "legal_name": "GrabPay Malaysia Berhad",
+                 "quote": "GrabPay Malaysia Berhad is the merchant of record", "reason": "made up"}]
     line = run()
     assert line["status"] == "CANNOT_VERIFY" and line["payee"] is None
 
 
 def test_name_unrelated_to_descriptor_is_rejected(setup):
     answers, run = setup
-    answers += [{"found": True, "result_index": 0, "field": "snippet", "legal_name": "Malaysia Sdn Bhd",
-                 "quote": "Malaysia Sdn Bhd", "reason": "wrong entity"}]
+    answers += [{"found": True, "result_index": 0, "field": "snippet", "legal_name": "Malaysia Berhad",
+                 "quote": "Malaysia Berhad", "reason": "wrong entity"}]
     assert run()["status"] == "CANNOT_VERIFY"
 
 
 def test_account_outside_chart_fails_closed(setup):
     answers, run = setup
     answers += [
-        {"found": True, "result_index": 0, "field": "snippet", "legal_name": "GrabPay Malaysia Sdn Bhd",
-         "quote": "provided by GrabPay Malaysia Sdn Bhd", "reason": "ok"},
+        {"found": True, "result_index": 0, "field": "snippet", "legal_name": "GrabPay Malaysia Berhad",
+         "quote": "provided by GrabPay Malaysia Berhad", "reason": "ok"},
         {"account_code": "1234", "reason": "invented code"},
     ]
     line = run()
-    assert line["status"] == "CANNOT_VERIFY" and line["payee"] == "GrabPay Malaysia Sdn Bhd"
+    assert line["status"] == "CANNOT_VERIFY" and line["payee"] == "GrabPay Malaysia Berhad"
 
 
 def test_pii_is_masked_before_prompting():
