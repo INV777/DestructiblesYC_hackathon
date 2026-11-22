@@ -31,6 +31,11 @@ def _common(p: argparse.ArgumentParser) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):  # Windows consoles: never crash on a curly quote
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0].endswith(".json"):
         argv = ["run"] + argv

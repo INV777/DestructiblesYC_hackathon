@@ -110,12 +110,15 @@ Every external call writes a ledger row with provider, operation, units, INR cos
 
 Set `crustdata.inr_per_credit` and `llm.price_inr_per_mtok` to your real prices so the INR figures are exact.
 
-## Screening demo (one command)
+## Screening demo (one command, works in Windows PowerShell)
 
 ```bash
-bash scripts/demo.sh            # live: Crustdata + Razorpay test mode (needs .env)
-bash scripts/demo.sh --offline  # same flow on fixtures and a fake provider, no network
+python scripts/demo.py             # live: Crustdata + Razorpay test mode (needs .env)
+python scripts/demo.py --pause     # waits for Enter before each step, with interactive decision cards (for recording)
+python scripts/demo.py --offline   # same flow on fixtures and a fake provider, no network
 ```
+
+On Windows, if `pip.exe` is blocked, install with `python -m pip install -r requirements.txt`. `scripts/demo.sh` is the same demo for bash.
 
 The script runs five steps:
 
