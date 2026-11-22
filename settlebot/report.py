@@ -103,6 +103,8 @@ def print_report(report: dict[str, Any]) -> None:
             what += f"  ->  {r['account']}"
         if r["status"] == "HELD_DUPLICATE":
             what = f"possible duplicate of line {r['related_line']}"
+        elif r["status"] == "HELD_FRAUD":
+            what = "blocked: " + (r["explanation"] or "")
         elif r["status"] == "CANNOT_VERIFY":
             what = "cannot verify: " + "; ".join(r["missing"][:1])
         if r.get("payment"):

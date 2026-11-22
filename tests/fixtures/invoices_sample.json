@@ -10,7 +10,8 @@
       "account_number": "50100123450001",
       "ifsc": "HDFC0000123",
       "name": "VRL LOGISTICS LIMITED"
-    }
+    },
+    "sender_email": "accounts@vrlgroup.in"
   },
   {
     "kind": "invoice",
@@ -49,6 +50,34 @@
       "account_number": "11112222333344",
       "ifsc": "SBIN0000001",
       "name": "SOMEONE"
+    }
+  },
+  {
+    "kind": "invoice",
+    "invoice_no": "VRL-889",
+    "vendor_id": "V001",
+    "date": "2026-10-14",
+    "description": "VRL Logistics",
+    "amount_inr": 61000,
+    "sender_email": "billing@vrlgr0up.in",
+    "bank_account": {
+      "account_number": "50100123450001",
+      "ifsc": "HDFC0000123",
+      "name": "VRL LOGISTICS LIMITED"
+    }
+  },
+  {
+    "kind": "invoice",
+    "invoice_no": "77",
+    "vendor_id": "V777",
+    "date": "2026-10-15",
+    "description": "VRL Logistlcs Limited",
+    "vendor_name": "VRL Logistlcs Limited",
+    "amount_inr": 15500,
+    "bank_account": {
+      "account_number": "99990000111122",
+      "ifsc": "KKBK0000999",
+      "name": "VRL LOGISTLCS"
     }
   }
 ]

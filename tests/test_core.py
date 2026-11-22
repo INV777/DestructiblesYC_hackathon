@@ -102,3 +102,25 @@ def test_invoices_bank_change_duplicate_and_unknown_vendor(tmp_path, cfg):
     assert lines[3]["status"] == "HELD_DUPLICATE" and lines[3]["related_line"] == 1  # INV-0101 == INV-101
     assert lines[4]["status"] == "CANNOT_VERIFY"                     # vendor not in master
     assert store.one("SELECT COUNT(*) AS n FROM journal WHERE run_id='inv'")["n"] == 1
+
+
+def test_lookalike_sender_domain_and_vendor_name_are_blocked(tmp_path, cfg):
+    store = run_fake(tmp_path, cfg, run_id="lk", input_path=INVOICES)
+    lines = {r["line"]: r for r in build_report(store, "lk")["lines"]}
+    assert lines[1]["status"] == "VERIFIED"                       # real domain on file
+    assert lines[5]["status"] == "HELD_FRAUD"                     # vrlgr0up.in imitates vrlgroup.in
+    assert "vrlgroup.in" in lines[5]["explanation"]
+    assert lines[6]["status"] == "HELD_FRAUD"                     # 'VRL Logistlcs' under unknown vendor id
+    assert "V001" in lines[6]["explanation"]
+
+
+def test_unverified_descriptor_that_resembles_known_payee_says_so(tmp_path, cfg):
+    p = tmp_path / "lines.json"
+    p.write_text(json.dumps([
+        {"date": "2026-10-03", "description": "RAZ*SWIGGY BLR", "amount_inr": 1240},
+        {"date": "2026-10-04", "description": "RAZ*SW1GGY BLR", "amount_inr": 990},
+    ]))
+    store = run_fake(tmp_path, cfg, run_id="sw", input_path=p)
+    lines = {r["line"]: r for r in build_report(store, "sw")["lines"]}
+    assert lines[2]["status"] == "CANNOT_VERIFY" and lines[2]["payee"] is None
+    assert any("resembles known payee 'Swiggy Limited'" in m for m in lines[2]["missing"])
