@@ -1,0 +1,73 @@
+# SettleBot configuration. Everything a judge might change in a live fix lives here.
+# Values marked TODO are filled at kickoff (client records, limits) or from price pages.
+
+client:
+  name: "TODO: client name from kickoff kit"
+
+limits:
+  max_cost_inr: 50.0        # TODO: set from kickoff kit (limits.max_cost_inr)
+  max_time_seconds: 600     # TODO: set from kickoff kit (limits.max_time_seconds)
+
+llm:
+  provider: anthropic       # reads ANTHROPIC_API_KEY from .env; no key -> rules only, fail closed
+  model: claude-haiku-5-5
+  max_tokens: 1024
+  temperature: 0.0
+  # INR per million tokens. TODO: fill from Anthropic's pricing page (USD price x FX rate).
+  price_inr_per_mtok:
+    input: 0.0
+    output: 0.0
+
+crustdata:
+  base_url: https://api.crustdata.com
+  api_version: "2025-11-01"
+  inr_per_credit: 0.0       # TODO: your plan's price per credit
+
+sources:
+  # Order in which payee sources are tried. "fake" is for tests only.
+  order: [crustdata_identify, crustdata_web]
+  timeout_seconds: 20
+  retries: 2
+  backoff_seconds: 1.5
+
+payments:
+  provider: razorpay_orders # razorpay_orders | fake
+  currency: INR
+  receipt_prefix: "sb_"     # receipt = prefix + 32 hex chars (Razorpay max is 40)
+
+approvals:
+  # One rule per line; the first matching rule decides how many approvers an action needs.
+  rules:
+    - {action: PAY, min_amount_inr: 0, approvers: 1}
+    - {action: RELEASE_HOLD, min_amount_inr: 0, approvers: 1}
+
+duplicates:
+  # Lines with the same date, descriptor and amount are held as possible duplicates.
+  same_day_only: true
+
+descriptor:
+  # Card/UPI processor prefixes stripped before looking up the merchant.
+  processor_prefixes:
+    "RAZ*": Razorpay
+    "PAYTM*": Paytm
+    "PYU*": PayU
+    "CCAV*": CCAvenue
+    "BDSK*": BillDesk
+    "UPI/": UPI
+    "POS ": POS
+  city_tokens: [BLR, BANGALORE, BENGALURU, MUM, MUMBAI, BOM, DEL, DELHI, NDL, HYD, HYDERABAD,
+                CHN, CHENNAI, MAA, PUNE, PNQ, KOL, KOLKATA, CCU, GGN, GURGAON, GURUGRAM, NOIDA, IN, IND]
+
+chart_of_accounts:
+  - {code: "6110", name: "Staff meals", keywords: [swiggy, zomato, food, meals, restaurant, cafe]}
+  - {code: "6420", name: "Cloud hosting", keywords: [aws, amazon web services, azure, google cloud, gcp, digitalocean, hosting]}
+  - {code: "6430", name: "Software subscriptions", keywords: [saas, subscription, software, slack, notion, atlassian, github]}
+  - {code: "5110", name: "Freight and carriage", keywords: [freight, transport, logistics, carrier, trucking, roadways]}
+  - {code: "6210", name: "Fuel", keywords: [fuel, petrol, diesel, indianoil, bharat petroleum, hpcl]}
+  - {code: "6310", name: "Travel", keywords: [uber, ola, makemytrip, indigo, airline, irctc, travel]}
+  - {code: "6510", name: "Telecom and internet", keywords: [airtel, jio, vodafone, telecom, broadband]}
+  - {code: "9999", name: "Suspense (needs review)", keywords: []}
+
+output:
+  # Optional fields added by live fixes, e.g. [tds_194c_estimate]
+  extra_fields: []

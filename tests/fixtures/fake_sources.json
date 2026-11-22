@@ -1,0 +1,21 @@
+{
+  "_comment": "TEST FIXTURE ONLY. Not real evidence. Used by --fake runs and the kill test.",
+  "SWIGGY": {
+    "legal_name": "Swiggy Limited",
+    "passage": "Legal name: Swiggy Limited",
+    "field": "registry.legal_name",
+    "url": "fake://registry/swiggy",
+    "record_date": "2026-10-09",
+    "domain": "swiggy.com",
+    "category_hint": "food delivery"
+  },
+  "AWS EMEA": {
+    "legal_name": "Amazon Web Services EMEA SARL",
+    "passage": "Amazon Web Services EMEA SARL",
+    "field": "invoice_entity.legal_name",
+    "url": "fake://web/aws-emea",
+    "record_date": "2026-10-01",
+    "domain": "aws.amazon.com",
+    "category_hint": "cloud hosting"
+  }
+}

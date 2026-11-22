@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+state.db
+state.db-*
+*.db
+*.db-wal
+*.db-shm
+out/
+cost_ledger.jsonl
+.pytest_cache/
