@@ -10,7 +10,8 @@ from __future__ import annotations
 import re
 
 SUFFIX = (r"(?:Private\s+Limited|Pvt\.?\s+Ltd\.?|Limited|Ltd\.?|LLP|S\.?A\.?R\.?L\.?|LLC|Inc\.?|GmbH|"
-          r"B\.V\.|S\.A\.|PLC|Plc|Corporation|Corp\.?|Pte\.?\s+Ltd\.?|AG|SE|N\.V\.)")
+          r"B\.V\.|S\.A\.|PLC|Plc|Corporation|Corp\.?|Pte\.?\s+Ltd\.?|Pty\.?\s+Ltd\.?|Sdn\.?\s+Bhd\.?|"
+          r"S\.p\.A\.|AG|SE|N\.V\.)")
 _WORD = r"[A-Z0-9][\w&.\-']*"
 _LEADING_JUNK = {"the", "name", "of", "listed", "entity", "legal", "company", "registered", "for", "read",
                  "by", "and", "from", "to", "is", "a", "an", "our", "by", "with", "about"}

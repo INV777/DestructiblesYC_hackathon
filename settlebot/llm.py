@@ -65,7 +65,6 @@ class Claude:
         lcfg = cfg.get("llm", {})
         self.model = lcfg.get("model", "claude-haiku-5-5")
         self.max_tokens = int(lcfg.get("max_tokens", 1024))
-        self.temperature = float(lcfg.get("temperature", 0.0))
         key = env("ANTHROPIC_API_KEY")
         if not key:
             raise ClaudeUnavailable("ANTHROPIC_API_KEY is not set")
@@ -88,7 +87,7 @@ class Claude:
             t0 = time.monotonic()
             try:
                 msg = self.client.messages.create(
-                    model=self.model, max_tokens=self.max_tokens, temperature=self.temperature, system=SYSTEM,
+                    model=self.model, max_tokens=self.max_tokens, system=SYSTEM,
                     tools=[tool], tool_choice={"type": "tool", "name": tool["name"]},
                     messages=[{"role": "user", "content": prompt}])
             except (self._anthropic.RateLimitError, self._anthropic.APIConnectionError,
@@ -184,8 +183,10 @@ class ClaudeDecider(RulesDecider):
     # ---- Claude picks an account; code checks the code exists -------------------
     def _choose_account(self, claude: Claude, item, norm, d: Decision, key, attempt) -> Decision:
         chart = "\n".join(f"{a['code']}: {a['name']}" for a in self.cfg.get("chart_of_accounts", []))
+        evidence = "\n".join(f"- {mask(c.field_or_passage)}" for c in d.citations[:3]) or "- (none)"
         prompt = (f"Payee: {d.payee}\nBank descriptor: {mask(item.description)}\nAmount: INR {item.amount_inr:,.2f}\n"
-                  f"Chart of accounts:\n{chart}\n\nChoose the account.")
+                  f"What the sources say about the payee:\n{evidence}\n"
+                  f"Chart of accounts:\n{chart}\n\nChoose the account using only the text above.")
         out = claude.call_tool(ACCOUNT_TOOL, prompt, item_key=key, step="decide", attempt=attempt)
         acct = account_by_code(str(out.get("account_code", "")), self.cfg)
         if not acct or acct[0] == "9999":
