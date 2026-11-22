@@ -154,9 +154,26 @@ class Runner:
                 self.limit_hit = True
                 d = Decision(status=Status.CANNOT_VERIFY, missing=[str(e)],
                              explanation="Stopped before deciding this line because a run limit was reached.")
+        if d.status == Status.CANNOT_VERIFY and not d.payee:
+            note = self._lookalike_note(done["normalize"]["merchant"])
+            if note:
+                d.missing.append(note)
         effects = [("UPDATE items SET status=?, decision_json=?, updated_at=datetime('now') WHERE run_id=? AND item_key=?",
                     (d.status.value, d.to_json(), self.run_id, key))]
         return d.to_dict(), effects
+
+    def _lookalike_note(self, merchant: str) -> str | None:
+        """Say so when an unverified descriptor resembles a payee we already know."""
+        from .lookalike import compare_names
+        known = {r["payee"] for r in self.store.q("SELECT DISTINCT payee FROM journal WHERE run_id=? AND payee IS NOT NULL",
+                                                   (self.run_id,))}
+        known |= {v["legal_name"] for v in self.vendor_master.values()}
+        for name in sorted(known):
+            why = compare_names(name, merchant)
+            if why:
+                return (f"The descriptor '{merchant}' resembles known payee '{name}' ({why}); it is treated as a "
+                        "different payee, not matched to it.")
+        return None
 
     def step_bank_check(self, item: LineItem, key: str, done: dict, attempt: int):
         d = check_invoice(item, Decision.from_dict(done["decide"]), self.vendor_master)

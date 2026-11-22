@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT))
 from settlebot.store import Store  # noqa: E402
 
 EXPECTED = {1: "VERIFIED", 2: "VERIFIED", 3: "HELD_DUPLICATE", 4: "CANNOT_VERIFY"}
-EXPECTED_INVOICES = {1: "VERIFIED", 2: "HELD_FRAUD", 3: "HELD_DUPLICATE", 4: "CANNOT_VERIFY"}
+EXPECTED_INVOICES = {1: "VERIFIED", 2: "HELD_FRAUD", 3: "HELD_DUPLICATE", 4: "CANNOT_VERIFY", 5: "HELD_FRAUD", 6: "HELD_FRAUD"}
 INVOICES = ROOT / "tests" / "fixtures" / "invoices_sample.json"
 
 
