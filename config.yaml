@@ -12,7 +12,8 @@ llm:
   provider: anthropic       # reads ANTHROPIC_API_KEY from .env; no key -> rules only, fail closed
   model: claude-haiku-5-5
   max_tokens: 1024
-  temperature: 0.0
+  # No temperature setting: the current Anthropic SDK does not take one. Determinism comes from
+  # forced tool calls, per-run caching of every answer, and code checks on every proposal.
   # INR per million tokens. TODO: fill from Anthropic's pricing page (USD price x FX rate).
   price_inr_per_mtok:
     input: 0.0
