@@ -1,0 +1,54 @@
+[
+  {
+    "kind": "invoice",
+    "invoice_no": "INV-101",
+    "vendor_id": "V001",
+    "date": "2026-10-05",
+    "description": "VRL Logistics",
+    "amount_inr": 48000,
+    "bank_account": {
+      "account_number": "50100123450001",
+      "ifsc": "HDFC0000123",
+      "name": "VRL LOGISTICS LIMITED"
+    }
+  },
+  {
+    "kind": "invoice",
+    "invoice_no": "TCI/7",
+    "vendor_id": "V002",
+    "date": "2026-10-06",
+    "description": "TCI Express",
+    "amount_inr": 12500,
+    "bank_account": {
+      "account_number": "33330000999999",
+      "ifsc": "YESB0000777",
+      "name": "TCI EXPRESS LTD"
+    }
+  },
+  {
+    "kind": "invoice",
+    "invoice_no": "INV-0101",
+    "vendor_id": "V001",
+    "date": "2026-10-12",
+    "description": "VRL Logistics",
+    "amount_inr": 48000,
+    "bank_account": {
+      "account_number": "50100123450001",
+      "ifsc": "HDFC0000123",
+      "name": "VRL LOGISTICS LIMITED"
+    }
+  },
+  {
+    "kind": "invoice",
+    "invoice_no": "A-55",
+    "vendor_id": "V009",
+    "date": "2026-10-08",
+    "description": "VRL Logistics",
+    "amount_inr": 3000,
+    "bank_account": {
+      "account_number": "11112222333344",
+      "ifsc": "SBIN0000001",
+      "name": "SOMEONE"
+    }
+  }
+]

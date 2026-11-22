@@ -1,0 +1,11 @@
+{
+  "_comment": "FICTIONAL vendor master for development. Replace with the client's records from the kickoff kit. Company names are real; bank details are made up.",
+  "vendors": [
+    {"vendor_id": "V001", "legal_name": "VRL Logistics Limited", "gstin": null,
+     "bank_account": {"account_number": "50100123450001", "ifsc": "HDFC0000123", "name": "VRL LOGISTICS LIMITED"}},
+    {"vendor_id": "V002", "legal_name": "TCI Express Limited", "gstin": null,
+     "bank_account": {"account_number": "00020456780002", "ifsc": "ICIC0000020", "name": "TCI EXPRESS LIMITED"}},
+    {"vendor_id": "V003", "legal_name": "Amazon Web Services EMEA SARL", "gstin": null,
+     "bank_account": {"account_number": "91201000300003", "ifsc": "CITI0000002", "name": "AMAZON WEB SERVICES EMEA SARL"}}
+  ]
+}

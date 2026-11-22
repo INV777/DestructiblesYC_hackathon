@@ -88,3 +88,17 @@ def test_cost_limit_fails_closed(tmp_path, cfg):
     statuses = [r["status"] for r in build_report(store, "t1")["lines"]]
     assert statuses == ["CANNOT_VERIFY", "CANNOT_VERIFY", "HELD_DUPLICATE", "CANNOT_VERIFY"]
     assert store.one("SELECT COUNT(*) AS n FROM journal")["n"] == 0
+
+
+INVOICES = ROOT / "tests" / "fixtures" / "invoices_sample.json"
+
+
+def test_invoices_bank_change_duplicate_and_unknown_vendor(tmp_path, cfg):
+    store = run_fake(tmp_path, cfg, run_id="inv", input_path=INVOICES)
+    lines = {r["line"]: r for r in build_report(store, "inv")["lines"]}
+    assert lines[1]["status"] == "VERIFIED" and lines[1]["account"] == "5110 Freight and carriage"
+    assert lines[2]["status"] == "HELD_FRAUD"
+    assert "33330000999999" not in lines[2]["explanation"]          # account numbers are masked
+    assert lines[3]["status"] == "HELD_DUPLICATE" and lines[3]["related_line"] == 1  # INV-0101 == INV-101
+    assert lines[4]["status"] == "CANNOT_VERIFY"                     # vendor not in master
+    assert store.one("SELECT COUNT(*) AS n FROM journal WHERE run_id='inv'")["n"] == 1
