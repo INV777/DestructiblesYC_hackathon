@@ -17,5 +17,21 @@
     "record_date": "2026-10-01",
     "domain": "aws.amazon.com",
     "category_hint": "cloud hosting"
+  },
+  "VRL LOGISTICS": {
+    "legal_name": "VRL Logistics Limited",
+    "passage": "VRL Logistics Limited is a logistics and transport company",
+    "field": "registry.legal_name",
+    "url": "fake://registry/vrl",
+    "record_date": "2026-09-30",
+    "category_hint": "freight logistics"
+  },
+  "TCI EXPRESS": {
+    "legal_name": "TCI Express Limited",
+    "passage": "TCI Express Limited, express cargo and courier services",
+    "field": "registry.legal_name",
+    "url": "fake://registry/tci",
+    "record_date": "2026-09-30",
+    "category_hint": "freight"
   }
 }

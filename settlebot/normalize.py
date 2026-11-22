@@ -36,5 +36,10 @@ def normalize_descriptor(desc: str, cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 def fingerprint(item: LineItem, descriptor_norm: str) -> str:
-    """Same date + same descriptor + same amount => same fingerprint (possible duplicate)."""
+    """Bank lines: same date + descriptor + amount. Invoices: same vendor + invoice number + amount
+    (a re-sent invoice often carries a new date, so the date is left out)."""
+    if item.kind == "invoice" and item.invoice_no:
+        inv = re.sub(r"[^A-Z0-9]", "", str(item.invoice_no).upper())
+        inv = re.sub(r"(?<!\d)0+(?=\d)", "", inv)  # INV-0101 == INV-101, but INV-1001 stays distinct
+        return sha256(f"invoice|{item.vendor_id}|{inv}|{item.amount_paise}")[:32]
     return sha256(f"{item.kind}|{item.date}|{descriptor_norm}|{item.amount_paise}")[:32]

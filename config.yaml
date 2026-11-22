@@ -41,6 +41,8 @@ approvals:
     - {action: PAY, min_amount_inr: 0, approvers: 1}
     - {action: RELEASE_HOLD, min_amount_inr: 0, approvers: 1}
 
+vendor_master: data/vendor_master.json   # TODO: replace with the client's vendor master from the kit
+
 duplicates:
   # Lines with the same date, descriptor and amount are held as possible duplicates.
   same_day_only: true

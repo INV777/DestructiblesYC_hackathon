@@ -16,8 +16,9 @@ from .normalize import fingerprint, normalize_descriptor
 from .sources import SourceContext, build_sources
 from .sources.base import PermanentError
 from .store import Store
+from .vendors import check_invoice, load_vendor_master
 
-STEPS = ["normalize", "dedupe", "resolve", "decide", "post"]
+STEPS = ["normalize", "dedupe", "resolve", "decide", "bank_check", "post"]
 
 
 class RunError(Exception):
@@ -62,6 +63,7 @@ class Runner:
             decider = make_decider(cfg, self.options)
         self.decider = decider
         self.limit_hit = False
+        self.vendor_master = load_vendor_master(cfg)
 
     # ---- main loop ------------------------------------------------------------
     def run(self) -> str:
@@ -156,8 +158,14 @@ class Runner:
                     (d.status.value, d.to_json(), self.run_id, key))]
         return d.to_dict(), effects
 
+    def step_bank_check(self, item: LineItem, key: str, done: dict, attempt: int):
+        d = check_invoice(item, Decision.from_dict(done["decide"]), self.vendor_master)
+        effects = [("UPDATE items SET status=?, decision_json=?, updated_at=datetime('now') WHERE run_id=? AND item_key=?",
+                    (d.status.value, d.to_json(), self.run_id, key))]
+        return d.to_dict(), effects
+
     def step_post(self, item: LineItem, key: str, done: dict, attempt: int):
-        d = Decision.from_dict(done["decide"])
+        d = Decision.from_dict(done["bank_check"])
         if d.status != Status.VERIFIED:
             return {"posted": False, "reason": d.status.value}, []
         entry_id = sha256(f"{self.run_id}|{key}|post")[:32]
@@ -228,8 +236,15 @@ class RulesDecider:
         hits = next(iter(groups.values()))
         h = hits[0]
         cites = [citation_for(x) for x in hits[:2]]
-        acct = map_account([norm["merchant"], h["legal_name"], (h.get("extra") or {}).get("category_hint") or "",
-                            (h.get("extra") or {}).get("title") or ""], self.cfg)
+        acct = None
+        hint = item.raw.get("account_code")
+        if hint:
+            from .accounts import account_by_code
+            a = account_by_code(str(hint), self.cfg)
+            if a and a[0] != "9999":
+                acct = (a[0], a[1], f"invoice coding gives account {a[0]}")
+        acct = acct or map_account([norm["merchant"], h["legal_name"], (h.get("extra") or {}).get("category_hint") or "",
+                                    (h.get("extra") or {}).get("title") or ""], self.cfg)
         if not acct:
             return Decision(status=Status.CANNOT_VERIFY, payee=h["legal_name"], citations=cites,
                             missing=["No chart-of-accounts rule matches this payee."],
@@ -237,8 +252,12 @@ class RulesDecider:
                                         "Held for a person.")
         code, name, kw = acct
         where = h.get("field") or "passage"
+        if kw.startswith("invoice coding"):
+            kw_text = kw
+        else:
+            kw_text = f"'{kw}' matches the chart of accounts"
         expl = (f"Descriptor '{item.description}' points to merchant '{norm['merchant']}'. "
                 f"{h['source']} ({where}) states \"{h['passage'][:160]}\", naming the payee {h['legal_name']}. "
-                f"Posted to {name} because '{kw}' matches the chart of accounts.")
+                f"Posted to {name} because {kw_text}.")
         return Decision(status=Status.VERIFIED, payee=h["legal_name"], account_code=code, account_name=name,
                         explanation=expl, citations=cites)
