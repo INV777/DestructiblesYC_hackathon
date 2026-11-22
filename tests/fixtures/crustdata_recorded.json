@@ -1,0 +1,34 @@
+{
+  "_comment": "Real Crustdata API responses recorded on 2026-11-22 (trimmed), replayed in tests only.",
+  "/company/identify": {
+    "SWIGGY": [{"matched_on": "SWIGGY", "match_type": "name", "matches": [
+      {"confidence_score": 1, "company_data": {"crustdata_company_id": 5702, "basic_info": {"name": "Swiggy", "primary_domain": "swiggy.com", "year_founded": 2014, "company_type": "Public Company"}}}]}],
+    "AWS EMEA": [{"matched_on": "AWS EMEA", "match_type": "name", "matches": [
+      {"confidence_score": 0.6, "company_data": {"basic_info": {"name": "Amazon Web Services (AWS)", "primary_domain": "aws.com"}}},
+      {"confidence_score": 0.6, "company_data": {"basic_info": {"name": "AWS Elemental", "primary_domain": "amazon.com"}}}]}],
+    "SHARMA TRD": [{"matched_on": "SHARMA TRD", "match_type": "name", "matches": [
+      {"confidence_score": 0.6, "company_data": {"basic_info": {"name": "Advocate Atul Sharma", "primary_domain": "advocateatulsharma.in"}}},
+      {"confidence_score": 0.6, "company_data": {"basic_info": {"name": "SHARMA", "primary_domain": null}}}]}]
+  },
+  "/web/search/live": {
+    "SWIGGY": {"success": true, "timestamp": 1795346060311, "metadata": {"total_results": 9}, "results": [
+      {"position": 1, "source": "web", "title": "Swiggy Limited", "url": "https://www.google.com/goto?url=CAESoQEBxCJF16RTcihWMCTuXd7o61XKgGYT6vr1dq",
+       "snippet": "Jan 8, 2025 — Registered & Corporate Office: No.55 Sy No.8-14, Ground Floor, I&J ... due verification by the depository participant and the name of the ...Read more"},
+      {"position": 2, "source": "web", "title": "Swiggy LEI 335800R11DC3QR7KH186", "url": "https://www.google.com/goto?url=CAESXwHEIkXXVTIoydR0rZbfVI0I0V7UPWeUXJoOCl0f0L",
+       "snippet": "Swiggy Limited, established in 2014, provides its users with a platform to search, select, order and pay for food (Food Delivery), groceries and household ...Read more"},
+      {"position": 3, "source": "web", "title": "Swiggy Business Responsibility Report 2024-25 | PDF", "url": "https://www.google.com/goto?url=CAEStAEBxCJF15Idc6M0qUr2kcBgVb8VfnymL4",
+       "snippet": "Name of the Listed Entity Swiggy Limited 3. Year of incorporation 2013 4. Registered office address No. 55, Sy No. 8-14, Ground Floor, I&J Block, Embassy ...Read more"}]},
+    "AWS EMEA": {"success": true, "timestamp": 1795346088489, "metadata": {"total_results": 9}, "results": [
+      {"position": 1, "source": "web", "title": "Consolidated billing in AWS EMEA", "url": "https://www.google.com/goto?url=CAESmAEBxCJF1z4xbV7qZGEzyY",
+       "snippet": "Consolidated billing in AWS EMEA · Consolidation period. AWS processes subscription invoices and refunds between 23:59 to 24:00 midnight UTC. · Services covered.Read more"},
+      {"position": 3, "source": "web", "title": "Understanding your bill - AWS Documentation - Amazon.com", "url": "https://www.google.com/goto?url=CAESkwEBxCJF1x8JwYqTBMsok",
+       "snippet": "(For AWS EMEA SARL) To download a copy of a particular tax invoice, choose the Invoice <invoiceID> in the Amazon Web Services EMEA SARL – Service Charges ...Read more"},
+      {"position": 4, "source": "web", "title": "AWS Europe FAQs - Amazon.com", "url": "https://aws.amazon.com/legal/aws-emea/",
+       "snippet": "Amazon Web Services EMEA SARL (“AWS EMEA”) is the Marketplace Operator for transactions between EMEA customers and Sellers who have onboarded to AWS EMEA.Read more"}]},
+    "SHARMA TRD": {"success": true, "timestamp": 1795346170000, "metadata": {"total_results": 8}, "results": [
+      {"position": 1, "source": "web", "title": "Vijay Shekhar Sharma is no longer the chairman of Paytm ...", "url": "https://themorningcontext.com/yesterday/vijay-shekhar-sharma",
+       "snippet": "26 Feb 2024 — Vijay Shekhar Sharma is no longer the chairman of Paytm Payments Bank. One97 Communications has reconstituted the board of the payments bank ..."},
+      {"position": 2, "source": "web", "title": "Who Owns Paytm in India", "url": "https://www.google.com/goto?url=CAESeQHEIkXXZFybHRKJL1g2DF67",
+       "snippet": "Paytm is owned by One97 Communications, an Indian company founded by Vijay Shekhar Sharma. As of early August 2025, Paytm is now 100% Indian-owned"}]}
+  }
+}
