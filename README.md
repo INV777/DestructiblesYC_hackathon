@@ -12,7 +12,11 @@ The job is accounts-payable verification and settlement. Raw bank-statement line
 3. holds duplicates and bank-detail fraud;
 4. pays only what a person approves, exactly once, even if the process is killed half-way.
 
-Today, mid-size 3PLs send this work to outside firms: accounting BPOs, CA back-offices, and freight audit and payment firms. They charge per invoice or as a share of freight spend. *Prices still to be sourced before the finals; see `finance:` in `config.yaml`.*
+Today, mid-size 3PLs send this work to outside firms: accounting BPOs, CA back-offices, and freight audit and payment firms. They charge per invoice.
+
+- **Outsourced price:** simple invoice processing runs about ₹50–80 per invoice, and ₹150–200 with three-way matching and GST checks ([Pazy, outsourcing AP in India](https://www.pazy.io/blogs/outsource-ap-guide-india)).
+- **In-house cost:** about ₹120 per manual invoice, fully loaded ([Tally Solutions](https://tallysolutions.com/accounting/the-roi-of-accounts-payable-automation-calculating-the-cost-of-a-manual-invoice/)).
+- **Our offer:** ₹12 per line, charged only for lines finished without a person. That is less than a quarter of the cheapest outsourced price. Each run prints our measured cost per line against that benchmark.
 
 ## Input
 

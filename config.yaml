@@ -20,8 +20,11 @@ llm:
     finance:
   # Our price, charged only when a line is done. Benchmark must carry a source before the finals.
   price_inr_per_line: 12.0
-  benchmark_inr_per_line: null      # TODO: sourced price an outsourced AP/BPO firm charges per line
-  benchmark_source_url: null        # TODO: link to that price
+  # Outsourced AP in India: "Simple invoice processing might cost Rs 50-80 per invoice", and
+  # 150-200 with three-way matching and GST checks (Pazy, AP outsourcing guide for India).
+  # We use the low end to stay conservative.
+  benchmark_inr_per_line: 50
+  benchmark_source_url: https://www.pazy.io/blogs/outsource-ap-guide-india
 
 output: 0.0
 
@@ -80,8 +83,11 @@ chart_of_accounts:
 finance:
   # Our price, charged only when a line is done. Benchmark must carry a source before the finals.
   price_inr_per_line: 12.0
-  benchmark_inr_per_line: null      # TODO: sourced price an outsourced AP/BPO firm charges per line
-  benchmark_source_url: null        # TODO: link to that price
+  # Outsourced AP in India: "Simple invoice processing might cost Rs 50-80 per invoice", and
+  # 150-200 with three-way matching and GST checks (Pazy, AP outsourcing guide for India).
+  # We use the low end to stay conservative.
+  benchmark_inr_per_line: 50
+  benchmark_source_url: https://www.pazy.io/blogs/outsource-ap-guide-india
 
 output:
   # Optional fields added by live fixes, e.g. [tds_194c_estimate]
