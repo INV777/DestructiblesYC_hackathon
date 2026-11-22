@@ -133,6 +133,7 @@ class CrustdataWeb(_CrustdataSource):
         problems: list[str] = []
         for q in queries:
             ev = self._search(q, item_key=item_key, step=step, attempt=attempt)
+            query.setdefault("_evidence", []).append(ev["evidence_id"])
             hits = self._extract(ev, merchant, ident)
             if hits:
                 return hits, problems

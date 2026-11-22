@@ -57,7 +57,10 @@ class Runner:
         ctx = SourceContext(store, self.ledger, cfg, run_id, self.options)
         names = self.options.get("sources") or cfg.get("sources", {}).get("order", [])
         self.sources = build_sources(names, ctx)
-        self.decider = decider or RulesDecider(cfg)
+        if decider is None:
+            from .llm import make_decider  # lazy: llm imports this module
+            decider = make_decider(cfg, self.options)
+        self.decider = decider
         self.limit_hit = False
 
     # ---- main loop ------------------------------------------------------------
@@ -117,7 +120,8 @@ class Runner:
                 self.guard.check(time.monotonic())
             except LimitReached as e:
                 self.limit_hit = True
-                return {"hits": [h.to_dict() for h in hits], "problems": problems, "limit": str(e)}, []
+                return {"hits": [h.to_dict() for h in hits], "problems": problems, "limit": str(e),
+                        "evidence_ids": query.get("_evidence", [])}, []
             try:
                 h, p = src.lookup(query, item_key=key, step="resolve", attempt=attempt)
             except PermanentError as e:
@@ -126,7 +130,8 @@ class Runner:
             problems.extend(p)
             if any(self._grounded(x.to_dict(), query["merchant"]) for x in h):
                 break  # first source that names the payee with a verifiable passage wins
-        return {"hits": [h.to_dict() for h in hits], "problems": problems}, []
+        return {"hits": [h.to_dict() for h in hits], "problems": problems,
+                "evidence_ids": query.get("_evidence", [])}, []
 
     def step_decide(self, item: LineItem, key: str, done: dict, attempt: int):
         dup = done["dedupe"]["duplicate_of_line"]
