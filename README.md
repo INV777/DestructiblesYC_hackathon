@@ -78,6 +78,8 @@ Six steps, each checkpointed:
 
    Two different legal names means `CANNOT_VERIFY`. People, the payment processor and lookalikes never qualify, which is why `PAYTM*SHARMA TRD` ends as cannot verify. The account comes from the chart of accounts in config. Claude only fills gaps the rules leave, and its output passes the same checks.
 5. **Bank check** for invoices: the vendor must be in the master, the live legal name must match the master, and the bank details must match.
+   - **Lookalikes:** an invoice is held as fraud if it names an imitation of a known vendor under an unknown vendor ID ("VRL Logistlcs"), or if it was sent from a domain that imitates the vendor's domain on file (`vrlgr0up.in` vs `vrlgroup.in`). The reason names the exact edit: a letter dropped, 0 for o, a different ending, the same name with a different legal form, and so on.
+   - **Bank lines:** a line that can't be verified but resembles a known payee (`SW1GGY`) says so, and is never matched to that payee.
 6. **Post** to the journal, with a unique entry ID, so each line posts once.
 
 ## Crash recovery ("kill on stage")
@@ -128,9 +130,19 @@ Tests run offline in about 2 seconds, using fixtures and recorded real responses
 python -m pytest -q
 python scripts/kill_test.py --rounds 20
 python scripts/kill_test.py --pay --rounds 20
+python scripts/smoke_live.py      # live check of Crustdata, Claude and Razorpay test mode (no side effects)
 ```
 
 `--fake` runs use fixture sources and are for tests only. They never make a real decision.
+
+## Prior art
+
+| Idea | Where it came from | Licence | What we reused |
+| --- | --- | --- | --- |
+| Lookalike categories and homoglyph folding | [dnstwist](https://github.com/elceef/dnstwist) | Apache-2.0 | The categories and the confusable-character idea. No code: dnstwist generates permutations forward, while `lookalike.py` compares two values in reverse to name the edit. |
+| Per-field evidence (source, passage, date, confidence) | [Parallel Task API "Basis"](https://docs.parallel.ai/task-api/guides/access-research-basis) | Docs | The shape of a citation record |
+| Exactly-once steps with idempotency keys | [DBOS Transact](https://github.com/DBOS-project/dbos-transact-py) | MIT | The pattern only (checkpoint each step, key each external action) |
+| Approval gate before risky calls | [HumanLayer](https://github.com/humanlayer/humanlayer) | Apache-2.0 | The pattern only (decision stored, resumable after restart) |
 
 ## Live-fix cheat sheet
 
@@ -141,7 +153,8 @@ python scripts/kill_test.py --pay --rounds 20
 | New account or mapping | `chart_of_accounts` |
 | New processor prefix (e.g. `PHONEPE*`) | `descriptor.processor_prefixes` |
 | New output field | `output.extra_fields`, plus the report builder |
-| Switch Claude model | `llm.model` |
+| Switch Claude model | `llm.model`, plus `llm.price_inr_per_mtok` |
+| New vendor domain on file | `domains` in the vendor master |
 
 ## Repository layout
 
