@@ -54,6 +54,34 @@ def build_report(store: Store, run_id: str) -> dict[str, Any]:
     }
 
 
+def unit_economics(report: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any]:
+    f = cfg.get("finance", {})
+    n = len(report["lines"])
+    done = sum(1 for r in report["lines"] if r["status"] == "VERIFIED")
+    price = float(f.get("price_inr_per_line") or 0)
+    cost = report["total_cost_inr"]
+    revenue = price * done                      # charged only for lines finished without a person
+    bench = f.get("benchmark_inr_per_line")
+    return {
+        "lines": n, "finished_lines": done, "measured_cost_inr": round(cost, 4),
+        "measured_cost_per_line_inr": round(cost / n, 4) if n else 0.0,
+        "price_inr_per_line": price, "revenue_inr": round(revenue, 2),
+        "margin_pct": round(100 * (revenue - cost) / revenue, 1) if revenue else None,
+        "benchmark_inr_per_line": bench, "benchmark_source_url": f.get("benchmark_source_url"),
+    }
+
+
+def print_unit_economics(ue: dict[str, Any]) -> None:
+    m = f"{ue['margin_pct']}%" if ue["margin_pct"] is not None else "n/a"
+    print(f"Unit economics: {ue['finished_lines']}/{ue['lines']} lines finished | measured cost INR "
+          f"{ue['measured_cost_inr']:.2f} ({ue['measured_cost_per_line_inr']:.2f}/line) | price INR "
+          f"{ue['price_inr_per_line']:.2f}/finished line | revenue INR {ue['revenue_inr']:.2f} | margin {m}")
+    if ue["benchmark_inr_per_line"] and ue["benchmark_source_url"]:
+        print(f"Outsourced benchmark: INR {ue['benchmark_inr_per_line']}/line ({ue['benchmark_source_url']})")
+    else:
+        print("Outsourced benchmark: not sourced yet (set finance.benchmark_* in config.yaml)")
+
+
 def write_report(report: dict[str, Any], out_dir: str | Path) -> Path:
     p = Path(out_dir) / report["run_id"]
     p.mkdir(parents=True, exist_ok=True)

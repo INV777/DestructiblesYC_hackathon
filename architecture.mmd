@@ -1,0 +1,44 @@
+%% SettleBot architecture: components, data flow, data calls, approvals, retries, cost ledger.
+flowchart TD
+    IN["Input batch (JSON)<br/>bank lines or invoices"] --> CLI["main.py run --run-id ID"]
+    CFG["config.yaml<br/>limits, chart of accounts,<br/>approval rules, prices"] --> CLI
+    CLI --> RUN["Runner<br/>one line at a time, fixed steps"]
+
+    subgraph STEPS["Steps per line (each checkpointed in state.db; restart skips finished steps)"]
+        N["1 normalize<br/>strip RAZ* / PAYTM* / city codes"] --> D["2 dedupe<br/>date+descriptor+amount, or vendor+invoice no+amount"]
+        D --> R["3 resolve payee"]
+        R --> DC["4 decide<br/>quote must be in stored response,<br/>name must match descriptor,<br/>one legal name only"]
+        DC --> BC["5 bank_check (invoices)<br/>vendor master + bank details"]
+        BC --> P["6 post to journal<br/>unique entry id = once"]
+    end
+    RUN --> N
+
+    GUARD["Budget and time guard<br/>checked before every paid call"] -.-> R
+    GUARD -.-> DC
+
+    R -- "cache per run, retry 429/5xx/timeout" --> CI["Crustdata /company/identify<br/>brand + domain (context only)"]
+    R -- "cache per run, retry" --> CW["Crustdata /web/search/live<br/>legal name + passage + date"]
+    DC -. "only when rules find nothing;<br/>PII-masked stored text" .-> CL["Claude API<br/>proposes, never a source"]
+
+    CI --> EV[("Evidence store<br/>raw responses + sha256")]
+    CW --> EV
+    CL --> EV
+    EV --> DC
+
+    D -- duplicate --> HOLD["Hold queue<br/>HELD_DUPLICATE / HELD_FRAUD / CANNOT_VERIFY"]
+    DC -- "no source / ambiguous / limit" --> HOLD
+    BC -- "bank details changed" --> HOLD
+
+    P --> APPROVE{"Human approval<br/>decision card [y/N]<br/>rules: N approvers above INR X"}
+    HOLD --> APPROVE
+    APPROVE -- "approved PAY" --> PAY["settle<br/>1 write IN_FLIGHT + receipt sb_hash<br/>2 look up receipt at provider<br/>3 create only if absent"]
+    PAY -- "retry = reconcile first" --> RZ["Razorpay Orders API<br/>test mode (rzp_test_ only)"]
+
+    CI --> LEDGER[("Cost ledger<br/>state.db + cost_ledger.jsonl<br/>every call: units, INR, ms, attempt")]
+    CW --> LEDGER
+    CL --> LEDGER
+    RZ --> LEDGER
+    LEDGER --> GUARD
+
+    P --> REP["report.json<br/>status, payee, account, reason,<br/>citations, approvals, payment,<br/>unit economics"]
+    APPROVE --> REP
