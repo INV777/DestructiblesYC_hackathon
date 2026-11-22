@@ -106,6 +106,21 @@ Every external call writes a ledger row with provider, operation, units, INR cos
 
 Set `crustdata.inr_per_credit` and `llm.price_inr_per_mtok` to your real prices so the INR figures are exact.
 
+## Screening demo (one command)
+
+```bash
+bash scripts/demo.sh            # live: Crustdata + Razorpay test mode (needs .env)
+bash scripts/demo.sh --offline  # same flow on fixtures and a fake provider, no network
+```
+
+The script runs five steps:
+
+1. Verify and post the bank lines.
+2. `kill -9` mid-run, then restart with the same run ID. It shows postings = 2, the steps redone, and the cached responses reused.
+3. Invoices: fraud, duplicate, unknown vendor, lookalike domain and lookalike name.
+4. Approve line 1 and pay. Paying again changes nothing (payments recorded = 1).
+5. The last cost-ledger rows.
+
 ## Quickstart
 
 ```bash
