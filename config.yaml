@@ -16,7 +16,13 @@ llm:
   # INR per million tokens. TODO: fill from Anthropic's pricing page (USD price x FX rate).
   price_inr_per_mtok:
     input: 0.0
-    output: 0.0
+    finance:
+  # Our price, charged only when a line is done. Benchmark must carry a source before the finals.
+  price_inr_per_line: 12.0
+  benchmark_inr_per_line: null      # TODO: sourced price an outsourced AP/BPO firm charges per line
+  benchmark_source_url: null        # TODO: link to that price
+
+output: 0.0
 
 crustdata:
   base_url: https://api.crustdata.com
@@ -69,6 +75,12 @@ chart_of_accounts:
   - {code: "6310", name: "Travel", keywords: [uber, ola, makemytrip, indigo, airline, irctc, travel]}
   - {code: "6510", name: "Telecom and internet", keywords: [airtel, jio, vodafone, telecom, broadband]}
   - {code: "9999", name: "Suspense (needs review)", keywords: []}
+
+finance:
+  # Our price, charged only when a line is done. Benchmark must carry a source before the finals.
+  price_inr_per_line: 12.0
+  benchmark_inr_per_line: null      # TODO: sourced price an outsourced AP/BPO firm charges per line
+  benchmark_source_url: null        # TODO: link to that price
 
 output:
   # Optional fields added by live fixes, e.g. [tds_194c_estimate]

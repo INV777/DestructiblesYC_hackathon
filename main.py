@@ -14,7 +14,7 @@ import argparse
 import sys
 
 from settlebot.config import load_config, load_dotenv
-from settlebot.report import build_report, print_report, write_report
+from settlebot.report import build_report, print_report, print_unit_economics, unit_economics, write_report
 import getpass
 import json
 
@@ -117,8 +117,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{len(pending)} decision(s) recorded by {approver}. Run again with --pay to settle.")
 
     report = build_report(store, args.run_id)
+    report["unit_economics"] = unit_economics(report, cfg)
     path = write_report(report, args.out)
     print_report(report)
+    print_unit_economics(report["unit_economics"])
     print(f"report: {path}")
     return 0
 
