@@ -39,6 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--run-id", required=True)
     run.add_argument("--fake", action="store_true", help="use fixture sources (tests only, never a real decision)")
     run.add_argument("--slow", type=float, default=0.0, help="fake sources only: delay per call, for kill tests")
+    run.add_argument("--no-llm", action="store_true", help="rules only, no Claude calls")
     _common(run)
 
     rep = sub.add_parser("report", help="print the audit report for a run")
@@ -51,9 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     store = Store(args.db)
 
     if args.cmd == "run":
-        options = {"out_dir": args.out, "slow": args.slow}
+        options = {"out_dir": args.out, "slow": args.slow, "no_llm": args.no_llm}
         if args.fake:
             options["sources"] = ["fake"]
+            options["no_llm"] = True
         try:
             runner = Runner(store, cfg, args.run_id, args.input, options)
         except RunError as e:
