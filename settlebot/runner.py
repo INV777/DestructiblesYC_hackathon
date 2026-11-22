@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .accounts import map_account
+from .entities import canonical, corroborates
 from .grounding import name_in_passage, passage_in_body
 from .ledger import Guard, Ledger, LimitReached
 from .models import Citation, Decision, LineItem, Status, sha256
@@ -123,7 +124,7 @@ class Runner:
                 h, p = [], [f"{src.name}: {e}"]
             hits.extend(h)
             problems.extend(p)
-            if any(self._grounded(x.to_dict()) for x in h):
+            if any(self._grounded(x.to_dict(), query["merchant"]) for x in h):
                 break  # first source that names the payee with a verifiable passage wins
         return {"hits": [h.to_dict() for h in hits], "problems": problems}, []
 
@@ -164,40 +165,75 @@ class Runner:
         return {"posted": True, "entry_id": entry_id}, effects
 
     # ---- helpers --------------------------------------------------------------
-    def _grounded(self, hit: dict) -> bool:
+    def _grounded(self, hit: dict, merchant: str | None = None) -> bool:
+        """Passage is in the stored response, names the payee, and ties it to the descriptor."""
         ev = self.store.evidence(hit["evidence_id"])
-        return bool(ev and hit.get("legal_name") and passage_in_body(hit["passage"], ev["body"])
-                    and name_in_passage(hit["legal_name"], hit["passage"]))
+        if not (ev and hit.get("legal_name") and passage_in_body(hit["passage"], ev["body"])
+                and name_in_passage(hit["legal_name"], hit["passage"])):
+            return False
+        if merchant is None or hit.get("source") == "fake":
+            return True
+        ident = (hit.get("extra") or {}).get("identify") or {}
+        keys = [merchant] + ([ident["name"]] if ident.get("name") else [])
+        return any(corroborates(k, hit["legal_name"], hit["passage"]) for k in keys)
+
+
+def citation_for(h: dict) -> Citation:
+    return Citation(source=h["source"], source_url=h["url"], field_or_passage=h["passage"],
+                    record_date=h.get("record_date"), retrieved_at=h["retrieved_at"],
+                    evidence_id=h["evidence_id"], field=h.get("field"))
+
+
+def cannot_verify_no_payee(item: LineItem, norm: dict, res: dict) -> Decision:
+    missing = [f"No source names a payee for descriptor '{item.description}' "
+               f"(searched merchant '{norm['merchant']}')."]
+    missing += res.get("problems", [])
+    return Decision(status=Status.CANNOT_VERIFY, missing=missing,
+                    explanation="No source identifies the payee. Held for a person.")
+
+
+def grounded_by_name(runner: "Runner", norm: dict, res: dict) -> dict[str, list[dict]]:
+    """Grounded hits grouped by canonical legal name."""
+    groups: dict[str, list[dict]] = {}
+    for h in res.get("hits", []):
+        if runner._grounded(h, norm["merchant"]):
+            groups.setdefault(canonical(h["legal_name"]), []).append(h)
+    return groups
+
+
+def ambiguous(groups: dict[str, list[dict]]) -> Decision:
+    names = sorted({g[0]["legal_name"] for g in groups.values()})
+    return Decision(status=Status.CANNOT_VERIFY, citations=[citation_for(g[0]) for g in groups.values()][:3],
+                    missing=[f"Sources name more than one possible payee: {'; '.join(names)}."],
+                    explanation="More than one legal entity fits this descriptor. Held for a person.")
 
 
 class RulesDecider:
-    """No-LLM decision: take the first grounded hit and map the account by keyword."""
+    """No-LLM decision: one grounded legal name, account mapped by keyword."""
 
     def __init__(self, cfg: dict[str, Any]):
         self.cfg = cfg
 
     def decide(self, item: LineItem, norm: dict, res: dict, runner: Runner, key: str, attempt: int) -> Decision:
-        grounded = [h for h in res.get("hits", []) if runner._grounded(h)]
-        if not grounded:
-            missing = [f"No source names a payee for descriptor '{item.description}' "
-                       f"(searched merchant '{norm['merchant']}')."]
-            missing += res.get("problems", [])
-            return Decision(status=Status.CANNOT_VERIFY, missing=missing,
-                            explanation="No source identifies the payee. Held for a person.")
-        h = grounded[0]
-        acct = map_account([norm["merchant"], h["legal_name"], (h.get("extra") or {}).get("category_hint") or ""],
-                           self.cfg)
-        cite = Citation(source=h["source"], source_url=h["url"], field_or_passage=h.get("field") or h["passage"],
-                        record_date=h.get("record_date"), retrieved_at=h["retrieved_at"],
-                        evidence_id=h["evidence_id"])
+        groups = grounded_by_name(runner, norm, res)
+        if not groups:
+            return cannot_verify_no_payee(item, norm, res)
+        if len(groups) > 1:
+            return ambiguous(groups)
+        hits = next(iter(groups.values()))
+        h = hits[0]
+        cites = [citation_for(x) for x in hits[:2]]
+        acct = map_account([norm["merchant"], h["legal_name"], (h.get("extra") or {}).get("category_hint") or "",
+                            (h.get("extra") or {}).get("title") or ""], self.cfg)
         if not acct:
-            return Decision(status=Status.CANNOT_VERIFY, payee=h["legal_name"], citations=[cite],
+            return Decision(status=Status.CANNOT_VERIFY, payee=h["legal_name"], citations=cites,
                             missing=["No chart-of-accounts rule matches this payee."],
                             explanation=f"Payee identified as {h['legal_name']}, but no account rule applies. "
                                         "Held for a person.")
         code, name, kw = acct
+        where = h.get("field") or "passage"
         expl = (f"Descriptor '{item.description}' points to merchant '{norm['merchant']}'. "
-                f"{h['source']} names it '{h['legal_name']}' (\"{h['passage']}\"). "
+                f"{h['source']} ({where}) states \"{h['passage'][:160]}\", naming the payee {h['legal_name']}. "
                 f"Posted to {name} because '{kw}' matches the chart of accounts.")
         return Decision(status=Status.VERIFIED, payee=h["legal_name"], account_code=code, account_name=name,
-                        explanation=expl, citations=[cite])
+                        explanation=expl, citations=cites)

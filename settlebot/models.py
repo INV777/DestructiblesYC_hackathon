@@ -72,6 +72,7 @@ class Citation:
     record_date: str | None  # date of the record itself, if the source gives one
     retrieved_at: str        # when we fetched it during this run
     evidence_id: str         # row in the evidence table holding the raw response
+    field: str | None = None # where in the response the passage sits, e.g. results[2].snippet
 
 
 @dataclass
