@@ -49,7 +49,7 @@ def pay_round(i: int, slow: float, max_restarts: int) -> dict:
         try:
             p.wait(timeout=random.uniform(0.05, slow * 4 + 0.4))
         except subprocess.TimeoutExpired:
-            os.kill(p.pid, signal.SIGKILL)
+            p.kill()
             p.wait()
             kills += 1
             continue
@@ -86,7 +86,7 @@ def one_round(i: int, input_path: Path, slow: float, max_restarts: int) -> dict:
         try:
             p.wait(timeout=delay)
         except subprocess.TimeoutExpired:
-            os.kill(p.pid, signal.SIGKILL)
+            p.kill()  # SIGKILL on POSIX, TerminateProcess on Windows
             p.wait()
             kills += 1
             continue
