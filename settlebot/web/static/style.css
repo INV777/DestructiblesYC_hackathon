@@ -124,15 +124,14 @@ legend { font: 700 var(--t-lg)/1.2 var(--display); margin-bottom: 0.5rem; paddin
   padding: 0.6rem 0.6rem; border-bottom: 1px solid var(--ink);
 }
 .ledger td { padding: 0.7rem 0.6rem; vertical-align: middle; }
-.ledger tbody > tr.row:nth-of-type(4n+1), .ledger tbody > tr.row:nth-of-type(4n+1) + tr.detail { background: var(--bar); }
+.ledger tbody > tr.row:nth-of-type(4n+1) > td, .ledger tbody > tr.row:nth-of-type(4n+1) + tr.detail > td { background: var(--bar); }
 .ledger .num { text-align: right; white-space: nowrap; }
 .ledger .line-no { color: var(--ink-soft); width: 2.5rem; }
 .ledger .desc { font-weight: 600; }
 .ledger .desc small { display: block; font-weight: 400; color: var(--ink-soft); }
 .ledger .open { border: 0; background: none; padding: 0.2rem; text-align: left; font: inherit; color: inherit; }
 .ledger .open:hover { background: none; text-decoration: underline; }
-.ledger.runs tbody > tr:nth-of-type(odd) { background: var(--bar); }
-.ledger.runs tbody > tr:nth-of-type(even) { background: none; }
+.ledger.runs tbody > tr:nth-of-type(odd) > td { background: var(--bar); }
 
 .steps { display: inline-flex; gap: 3px; }
 .steps i {
@@ -250,7 +249,8 @@ pre.json mark { background: #e4defa; color: var(--ink); outline: 2px solid var(-
     display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; gap: 0.4rem 0.5rem; padding: 0.7rem 0;
     grid-template-areas: "no desc amt" "no verdict verdict" "no payee payee";
   }
-  .ledger tr.row td { padding: 0 0.4rem; width: auto; }
+  .ledger tr.row td { padding: 0 0.4rem; width: auto; background: none !important; }
+  .ledger tbody > tr.row:nth-of-type(4n+1), .ledger tbody > tr.row:nth-of-type(4n+1) + tr.detail { background: var(--bar); }
   .ledger .line-no { grid-area: no; }
   .ledger .desc { grid-area: desc; }
   .ledger .num { grid-area: amt; }

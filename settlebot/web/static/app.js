@@ -351,7 +351,7 @@ function renderRun(data) {
       <li><b>${money(t.total_cost_inr)}</b>spent${t.replay ? " (replay)" : ""}</li>
     </ul>` : ""}
     <table class="ledger">
-      <caption class="small muted" style="text-align:left;caption-side:bottom;padding-top:.5rem">Select a description to see why, and the exact passage each fact comes from.</caption>
+      <caption class="small muted" style="text-align:left;caption-side:bottom;padding-top:.5rem">Select a description to see why, and the exact passage each fact comes from.${lines.some((l) => l.steps.some((s) => s.attempts > 1)) ? " A red-outlined check is a step a crash cut off; it was redone from saved state." : ""}</caption>
       <thead><tr><th scope="col">Line</th><th scope="col" class="col-date">Date</th><th scope="col">Description</th>
         <th scope="col" class="num">Amount</th><th scope="col" class="col-steps">Checks</th><th scope="col">Verdict</th><th scope="col">Payee</th></tr></thead>
       <tbody>${lines.map((l) => {
