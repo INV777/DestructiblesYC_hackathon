@@ -18,6 +18,10 @@ python main.py console            # then open http://127.0.0.1:8000
 
 Start a run on "Bank lines from the problem statement" with recorded responses, crash the worker halfway, resume it, then open a line to see the exact passage behind each fact. The recorded responses are real Crustdata API answers from 22 Nov 2026, so nothing is spent.
 
+**Host your own public demo** on Render's free plan (no keys needed; it starts with two finished example runs):
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/INV777/Settlebot)
+
 **Contents:** [The service](#1-the-service) · [What it does now](#2-what-it-does-now) · [What comes next](#3-what-comes-next) · [How it runs](#4-how-it-runs) · [What we tried](#5-what-we-tried) · [Why this way](#6-why-this-way)
 
 ---
@@ -250,6 +254,8 @@ python main.py console --demo              # public demo: replay and fixtures on
 | Live | Crustdata, plus Claude if `ANTHROPIC_API_KEY` is set; payments in Razorpay test mode if test keys are set | `.env` |
 
 Runs and their database live in `console_data/` (git-ignored). Payments go to a simulated provider unless the run is live and Razorpay test keys are set.
+
+**Public demo on Render:** `render.yaml` describes one free web service that runs `python main.py console --demo` on Python 3.12 (`.python-version`). Demo mode allows only recorded and fixture data, pays a simulated provider, caps uploads at 50 lines and three workers at a time, and starts with one finished run of each sample. Free instances sleep after 15 idle minutes and take about a minute to wake, and the disk is temporary, so runs are cleared whenever the instance restarts.
 
 **Quickstart (command line):**
 

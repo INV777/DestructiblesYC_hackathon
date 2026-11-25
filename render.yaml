@@ -1,0 +1,17 @@
+# Render Blueprint: the public SettleBot demo (free plan).
+# Deploy: https://render.com/deploy?repo=https://github.com/INV777/Settlebot
+# Demo mode serves recorded and fixture data only, pays a simulated provider,
+# and needs no API keys. Free instances sleep after 15 idle minutes and take
+# about a minute to wake; runs are cleared whenever the instance restarts.
+services:
+  - type: web
+    name: settlebot-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py console --demo --host 0.0.0.0
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: SETTLEBOT_DEMO
+        value: "1"

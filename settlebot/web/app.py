@@ -71,9 +71,10 @@ def _can_pay_live() -> bool:
 
 
 def create_app(data_dir: str | Path | None = None, config_path: str | Path | None = None,
-               demo: bool | None = None) -> FastAPI:
+               demo: bool | None = None, seed: bool | None = None) -> FastAPI:
     load_dotenv()
     demo = (os.environ.get("SETTLEBOT_DEMO") == "1") if demo is None else demo
+    seed = (os.environ.get("SETTLEBOT_DEMO_SEED", "1") == "1") if seed is None else seed
     paths = Paths(Path(data_dir or os.environ.get("SETTLEBOT_DATA_DIR") or ROOT / "console_data"))
     paths.make()
     config_path = Path(config_path or ROOT / "config.yaml")
@@ -93,6 +94,13 @@ def create_app(data_dir: str | Path | None = None, config_path: str | Path | Non
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        if demo and seed and not workers.all_meta():
+            # A visitor's first look should be finished runs they can open, not an empty list.
+            for key in SAMPLES:
+                try:
+                    start_run(NewRun(sample=key, mode=SAMPLES[key]["mode"]))
+                except HTTPException:
+                    pass
         yield
         workers.stop_all()
 
@@ -138,6 +146,9 @@ def create_app(data_dir: str | Path | None = None, config_path: str | Path | Non
 
     @app.post("/api/runs", status_code=201)
     def new_run(body: NewRun):
+        return start_run(body)
+
+    def start_run(body: NewRun) -> dict[str, str]:
         if body.mode not in MODES:
             raise HTTPException(400, f"Unknown data mode '{body.mode}'. Use replay, fixtures or live.")
         if body.mode == "live" and not live_allowed():

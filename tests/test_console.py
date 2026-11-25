@@ -130,7 +130,7 @@ def test_bad_requests_are_explained(client):
 
 def test_demo_mode_never_allows_live(tmp_path, monkeypatch):
     monkeypatch.setenv("CRUSTDATA_API_KEY", "not-a-real-key")
-    app = create_app(data_dir=tmp_path / "d", config_path=ROOT / "config.yaml", demo=True)
+    app = create_app(data_dir=tmp_path / "d", config_path=ROOT / "config.yaml", demo=True, seed=False)
     with TestClient(app) as c:
         info = c.get("/api/info").json()
         assert info["demo"] and not info["modes"]["live"]["available"] and info["payments"] == "simulated provider"
@@ -138,3 +138,18 @@ def test_demo_mode_never_allows_live(tmp_path, monkeypatch):
         too_many = [{"date": "2026-10-01", "description": "X", "amount_inr": 1}] * 51
         assert c.post("/api/runs", json={"lines": too_many, "mode": "fixtures"}).status_code == 413
         assert c.get("/").status_code == 200 and "SettleBot" in c.get("/").text
+
+
+def test_public_demo_starts_with_finished_example_runs(tmp_path, monkeypatch):
+    monkeypatch.delenv("CRUSTDATA_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
+    app = create_app(data_dir=tmp_path / "d", config_path=ROOT / "config.yaml", demo=True)
+    with TestClient(app) as c:
+        runs = c.get("/api/runs").json()
+        assert {r["label"] for r in runs} == {"Bank lines from the problem statement", "Freight vendor invoices"}
+        for r in runs:
+            d = wait_idle(c, r["run_id"])
+            assert d["lines"] and all(l["status"] != "PENDING" for l in d["lines"])
+    # A restart with runs already present does not add more.
+    with TestClient(create_app(data_dir=tmp_path / "d", config_path=ROOT / "config.yaml", demo=True)) as c:
+        assert len(c.get("/api/runs").json()) == 2
