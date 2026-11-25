@@ -14,19 +14,11 @@ llm:
   max_tokens: 1024
   # No temperature setting: the current Anthropic SDK does not take one. Determinism comes from
   # forced tool calls, per-run caching of every answer, and code checks on every proposal.
-  # INR per million tokens. TODO: fill from Anthropic's pricing page (USD price x FX rate).
+  # INR per million tokens for claude-haiku-5-5 (prompts up to 100K tokens):
+  # USD 0.10 in / 0.50 out per MTok x RBI reference rate 93.3461 INR/USD (19 Nov 2026).
   price_inr_per_mtok:
-    input: 0.0
-    finance:
-  # Our price, charged only when a line is done. Benchmark must carry a source before the finals.
-  price_inr_per_line: 12.0
-  # Outsourced AP in India: "Simple invoice processing might cost Rs 50-80 per invoice", and
-  # 150-200 with three-way matching and GST checks (Pazy, AP outsourcing guide for India).
-  # We use the low end to stay conservative.
-  benchmark_inr_per_line: 50
-  benchmark_source_url: https://www.pazy.io/blogs/outsource-ap-guide-india
-
-output: 0.0
+    input: 9.33
+    output: 46.67
 
 crustdata:
   base_url: https://api.crustdata.com

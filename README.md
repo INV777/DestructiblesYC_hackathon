@@ -1,7 +1,11 @@
 # SettleBot: payables and bank-line posting that pays each invoice exactly once
 
+[![CI](https://github.com/INV777/Settlebot/actions/workflows/ci.yml/badge.svg)](https://github.com/INV777/Settlebot/actions/workflows/ci.yml)
+
 **Track:** Buying and paying (ContextCon 05, BITS Pilani: *Services, Replaced*)
 **Client:** a mid-size Indian 3PL
+
+**Project history:** built by team DestructiblesYC at ContextCon 05 on 22 Nov 2026 (the submitted version is commit `2a3abed`). Work since then is listed under [After the hackathon](#after-the-hackathon).
 
 **Contents:** [The service](#1-the-service) · [What it does now](#2-what-it-does-now) · [What comes next](#3-what-comes-next) · [How it runs](#4-how-it-runs) · [What we tried](#5-what-we-tried) · [Why this way](#6-why-this-way)
 
@@ -72,7 +76,7 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 
 | Requirement | How it is checked | Result |
 | --- | --- | --- |
-| Every `VERIFIED` fact is sourced: its quote appears verbatim in a response stored during the run | `grounding.py` on every fact; tests replay real Crustdata responses | 29 tests pass offline in about 3 s |
+| Every `VERIFIED` fact is sourced: its quote appears verbatim in a response stored during the run | `grounding.py` on every fact; tests replay real Crustdata responses | 32 tests pass offline in about 5 s; CI runs them on every push |
 | Duplicates are never posted or paid; changed bank details are blocked; an unidentifiable payee gives `CANNOT_VERIFY`, not a guess | Fixture batches in `tests/` (`PAYTM*SHARMA TRD` must end as cannot verify) | Pass |
 | Restarts are exactly-once | `scripts/kill_test.py --rounds 20` (kills during verification) and `--pay --rounds 20` (kills during payment) | 20/20 rounds in each. In the payment test, 8 kills landed after the order reached Razorpay but before it was recorded; each restart adopted the order |
 | Limits hold: cost under `limits.max_cost_inr`, active time under `limits.max_time_seconds` | Guard checks before every paid call | Remaining lines fail closed to `CANNOT_VERIFY` |
@@ -81,12 +85,21 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 
 ## 3. What comes next
 
-**Before the finals**
+### After the hackathon
 
-- Replace the fictional vendor master (`data/vendor_master.json`), chart of accounts and limits with the client's records.
-- Set real INR prices per Crustdata credit (`crustdata.inr_per_credit`, currently a volume-tier placeholder of ₹0.93) and per Claude token (`llm.price_inr_per_mtok`), so the unit economics are exact.
+**Done**
 
-**After the hackathon**
+- **Claude calls are priced in rupees again.** A broken price block in `config.yaml` had logged every Claude call at ₹0, so the cost limit ignored model spend. Prices are now ₹9.33 in / ₹46.67 out per million tokens (USD 0.10 / 0.50 for `claude-haiku-5-5` × RBI reference rate 93.3461 on 19 Nov 2026), with a regression test.
+- **Duplicate invoices are explained correctly.** The hold reason now says "same vendor, invoice number and amount" for invoices, and keeps "same date, descriptor and amount" for bank lines.
+- **Payment runs no longer hang in Windows scripts.** With input redirected from `NUL`, Windows reports a terminal, so `run --pay` waited on a prompt nobody could answer and crashed. SettleBot now checks for a real console, and an unanswered prompt always leaves the action pending. CI found this on its first run.
+- **CI** runs the tests and both kill tests (verification and payment) on Linux and Windows for every push and pull request.
+
+**Still open**
+
+- Replace the fictional vendor master (`data/vendor_master.json`), chart of accounts and limits with a real client's records.
+- Set the real INR price per Crustdata credit (`crustdata.inr_per_credit` is still a volume-tier placeholder of ₹0.93).
+
+**Planned**
 
 - **Match on registry IDs, not names.** Use GSTIN, PAN and CIN as the join key between invoice, vendor master and live sources (the vendor master already has a `gstin` field).
 - **Bank-account name check.** Confirm that the account holder's name matches the vendor before the first payment to new bank details, using a provider's account-validation API.
