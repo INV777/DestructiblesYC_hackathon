@@ -7,6 +7,8 @@
 
 **Project history:** built by team DestructiblesYC at ContextCon 05 on 22 Nov 2026 (the submitted version is the [`Hackathon` release](https://github.com/INV777/Settlebot/releases/tag/Hackathon)). Work since then is listed under [After the hackathon](#after-the-hackathon).
 
+**Live demo: https://settlebot-demo.onrender.com** (free hosting: the first visit after a quiet spell takes about a minute to wake up). It runs on recorded and invented data with a simulated payment provider, so nothing real is checked, spent or paid.
+
 ![The SettleBot console: a run is crashed halfway through a lookup, resumed, and a line's evidence opened in the stored API response](docs/screenshots/console-demo.gif)
 
 **Try it with no keys:**
