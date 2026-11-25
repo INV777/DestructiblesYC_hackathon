@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -75,19 +77,64 @@ def _clean_snippet(s: str) -> str:
     return re.sub(r"\s*(?:\.\.\.)?Read more\s*$", "", s or "").strip()
 
 
+DEFAULT_CASSETTE = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "crustdata_recorded.json"
+
+
+def _match_text(path: str, body: dict[str, Any]) -> str:
+    if path == "/company/identify":
+        return " ".join(str(n) for n in body.get("names", [])).upper()
+    return str(body.get("query", "")).upper()
+
+
+class ReplayClient:
+    """Serves real Crustdata responses recorded earlier, instead of calling the API.
+
+    Cassette format: {"_recorded_at": "...", "<path>": {"<KEY>": <response>, ...}}. A request matches
+    the longest KEY found in its company name or search query (upper case). Unmatched requests get
+    an empty answer, exactly as the live API does for an unknown company, so the line fails closed.
+    Replays cost nothing and are never presented as a new live check."""
+
+    base = "https://api.crustdata.com"
+
+    def __init__(self, cassette: str | Path, slow: float = 0.0):
+        self.path = Path(cassette)
+        self.data = json.loads(self.path.read_text(encoding="utf-8"))
+        self.recorded_at = self.data.get("_recorded_at")
+        self.slow = slow
+
+    def post(self, path: str, body: dict[str, Any]) -> tuple[Any, float]:
+        if self.slow:
+            time.sleep(self.slow)
+        text = _match_text(path, body)
+        recorded = self.data.get(path, {})
+        keys = sorted((k for k in recorded if not k.startswith("_") and k in text), key=len, reverse=True)
+        if keys:
+            return recorded[keys[0]], DEFAULT_CREDITS.get(path, 0.0)
+        return ({"results": []} if "search" in path else []), DEFAULT_CREDITS.get(path, 0.0)
+
+
 class _CrustdataSource(Source):
     provider = "crustdata"
 
     def __init__(self, ctx):
         super().__init__(ctx)
-        self.client = CrustdataClient(ctx.cfg)
+        replay = ctx.options.get("replay")
+        if replay:
+            self.client = ReplayClient(DEFAULT_CASSETTE if replay is True else replay,
+                                       slow=float(ctx.options.get("slow", 0)))
+            self.provider = "crustdata-replay"
+        else:
+            self.client = CrustdataClient(ctx.cfg)
 
     def _call(self, path: str, body: dict[str, Any]):
+        replay = isinstance(self.client, ReplayClient)
+
         def call() -> Fetched:
             data, credits = self.client.post(path, body)
             return Fetched(body=json.dumps(data, ensure_ascii=False, sort_keys=True), url=self.client.base + path,
                            record_date=None, units=credits, unit_type="credits",
-                           cost_inr=self.ctx.ledger.crustdata_inr(credits))
+                           cost_inr=0.0 if replay else self.ctx.ledger.crustdata_inr(credits),
+                           retrieved_at=self.client.recorded_at if replay else None)
         return call
 
 
