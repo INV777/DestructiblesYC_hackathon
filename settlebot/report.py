@@ -43,6 +43,8 @@ def build_report(store: Store, run_id: str) -> dict[str, Any]:
         })
     cost = store.total_cost(run_id)
     calls = store.one("SELECT COUNT(*) AS n, SUM(cache_hit) AS c FROM ledger WHERE run_id=?", (run_id,))
+    replayed = store.one("SELECT COUNT(*) AS n, COALESCE(SUM(units), 0) AS credits FROM ledger WHERE run_id=? "
+                         "AND provider LIKE '%-replay' AND ok=1 AND cache_hit=0", (run_id,))
     return {
         "run_id": run_id,
         "status": run["status"],
@@ -50,6 +52,9 @@ def build_report(store: Store, run_id: str) -> dict[str, Any]:
         "total_cost_inr": round(cost, 4),
         "cost_per_line_inr": round(cost / len(rows), 4) if rows else 0.0,
         "ledger_calls": calls["n"], "cache_hits": calls["c"] or 0,
+        # Replayed calls cost nothing; keep their credits so the live cost can still be estimated.
+        "replay": ({"calls": replayed["n"], "credits": round(float(replayed["credits"]), 4)}
+                   if replayed["n"] else None),
         "lines": rows,
     }
 
@@ -62,17 +67,27 @@ def unit_economics(report: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any
     cost = report["total_cost_inr"]
     revenue = price * done                      # charged only for lines finished without a person
     bench = f.get("benchmark_inr_per_line")
+    replay = report.get("replay")
+    live_est = None
+    basis = cost
+    if replay:  # nothing was spent; estimate what the same calls cost live, and judge the margin on that
+        live_est = round(replay["credits"] * float(cfg.get("crustdata", {}).get("inr_per_credit", 0)), 4)
+        basis = cost + live_est
     return {
-        "lines": n, "finished_lines": done, "measured_cost_inr": round(cost, 4),
+        "replay": bool(replay), "live_cost_estimate_inr": live_est,
+        "lines": n, "finished_lines": done, "measured_cost_inr": round(report["total_cost_inr"], 4),
         "measured_cost_per_line_inr": round(cost / n, 4) if n else 0.0,
         "price_inr_per_line": price, "revenue_inr": round(revenue, 2),
-        "margin_pct": round(100 * (revenue - cost) / revenue, 1) if revenue else None,
+        "margin_pct": round(100 * (revenue - basis) / revenue, 1) if revenue else None,
         "benchmark_inr_per_line": bench, "benchmark_source_url": f.get("benchmark_source_url"),
     }
 
 
 def print_unit_economics(ue: dict[str, Any]) -> None:
     m = f"{ue['margin_pct']}%" if ue["margin_pct"] is not None else "n/a"
+    if ue.get("replay"):
+        print(f"Replay: recorded responses, nothing spent. The same calls live: about INR "
+              f"{ue['live_cost_estimate_inr']:.2f} at crustdata.inr_per_credit (margin below uses that).")
     print(f"Unit economics: {ue['finished_lines']}/{ue['lines']} lines finished | measured cost INR "
           f"{ue['measured_cost_inr']:.2f} ({ue['measured_cost_per_line_inr']:.2f}/line) | price INR "
           f"{ue['price_inr_per_line']:.2f}/finished line | revenue INR {ue['revenue_inr']:.2f} | margin {m}")

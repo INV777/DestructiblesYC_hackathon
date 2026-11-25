@@ -111,7 +111,7 @@ class Claude:
             block = next((b for b in msg.content if getattr(b, "type", "") == "tool_use"), None)
             out = {"input": dict(block.input) if block else {}, "model": self.model}
             body = json.dumps(out, ensure_ascii=False, sort_keys=True)
-            store.save_evidence({"evidence_id": sha256(f"claude|{qkey}|{body}")[:24], "run_id": run_id,
+            store.save_evidence({"evidence_id": sha256(f"{run_id}|claude|{qkey}|{body}")[:24], "run_id": run_id,
                                  "source": "claude", "query_key": qkey, "url": f"anthropic:{self.model}",
                                  "retrieved_at": now_iso(), "record_date": None, "body_sha256": sha256(body),
                                  "body": body})

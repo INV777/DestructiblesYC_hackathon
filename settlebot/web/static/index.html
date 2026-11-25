@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SettleBot console</title>
+  <meta name="description" content="Checks bank lines and invoices against company data, holds what it cannot prove, and pays each approved invoice exactly once.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='3' fill='none' stroke='%234B3CA7' stroke-width='3'/%3E%3Cpath d='M9 17l5 5 9-11' fill='none' stroke='%234B3CA7' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="masthead">
+    <div class="masthead__inner">
+      <a class="wordmark" href="#/">SettleBot</a>
+      <p class="tagline">Checks each bank line and invoice against company records, holds what it can’t prove, and pays each approved invoice exactly once.</p>
+      <label class="approver">
+        <span>Approving as</span>
+        <input id="approver" name="approver" autocomplete="name" placeholder="Your name" maxlength="60">
+      </label>
+    </div>
+    <p class="demo-note" id="demo-note" hidden>Public demo. Runs use recorded or invented data, payments go to a simulated provider, and everything here is visible to other visitors and cleared on restart. Don’t upload real bank details.</p>
+  </header>
+
+  <main id="main" tabindex="-1"></main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="evidence" aria-labelledby="evidence-title">
+    <form method="dialog" class="dialog__close"><button aria-label="Close">Close</button></form>
+    <h2 id="evidence-title">Stored response</h2>
+    <div id="evidence-body"></div>
+  </dialog>
+
+  <footer class="foot">
+    <p>Built at ContextCon 05, BITS Pilani. <a href="https://github.com/INV777/Settlebot">Source on GitHub</a>. <a href="/api/docs">API</a>.</p>
+  </footer>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

@@ -5,7 +5,18 @@
 **Track:** Buying and paying (ContextCon 05, BITS Pilani: *Services, Replaced*)
 **Client:** a mid-size Indian 3PL
 
-**Project history:** built by team DestructiblesYC at ContextCon 05 on 22 Nov 2026 (the submitted version is commit `2a3abed`). Work since then is listed under [After the hackathon](#after-the-hackathon).
+**Project history:** built by team DestructiblesYC at ContextCon 05 on 22 Nov 2026 (the submitted version is the [`Hackathon` release](https://github.com/INV777/Settlebot/releases/tag/Hackathon)). Work since then is listed under [After the hackathon](#after-the-hackathon).
+
+![The SettleBot console: a run is crashed halfway through a lookup, resumed, and a line's evidence opened in the stored API response](docs/screenshots/console-demo.gif)
+
+**Try it with no keys:**
+
+```bash
+python -m pip install -r requirements.txt
+python main.py console            # then open http://127.0.0.1:8000
+```
+
+Start a run on "Bank lines from the problem statement" with recorded responses, crash the worker halfway, resume it, then open a line to see the exact passage behind each fact. The recorded responses are real Crustdata API answers from 22 Nov 2026, so nothing is spent.
 
 **Contents:** [The service](#1-the-service) · [What it does now](#2-what-it-does-now) · [What comes next](#3-what-comes-next) · [How it runs](#4-how-it-runs) · [What we tried](#5-what-we-tried) · [Why this way](#6-why-this-way)
 
@@ -76,7 +87,7 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 
 | Requirement | How it is checked | Result |
 | --- | --- | --- |
-| Every `VERIFIED` fact is sourced: its quote appears verbatim in a response stored during the run | `grounding.py` on every fact; tests replay real Crustdata responses | 32 tests pass offline in about 5 s; CI runs them on every push |
+| Every `VERIFIED` fact is sourced: its quote appears verbatim in a response stored during the run | `grounding.py` on every fact; tests replay real Crustdata responses | 42 tests pass offline in about 20 s; CI runs them on every push |
 | Duplicates are never posted or paid; changed bank details are blocked; an unidentifiable payee gives `CANNOT_VERIFY`, not a guess | Fixture batches in `tests/` (`PAYTM*SHARMA TRD` must end as cannot verify) | Pass |
 | Restarts are exactly-once | `scripts/kill_test.py --rounds 20` (kills during verification) and `--pay --rounds 20` (kills during payment) | 20/20 rounds in each. In the payment test, 8 kills landed after the order reached Razorpay but before it was recorded; each restart adopted the order |
 | Limits hold: cost under `limits.max_cost_inr`, active time under `limits.max_time_seconds` | Guard checks before every paid call | Remaining lines fail closed to `CANNOT_VERIFY` |
@@ -93,6 +104,10 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 - **Duplicate invoices are explained correctly.** The hold reason now says "same vendor, invoice number and amount" for invoices, and keeps "same date, descriptor and amount" for bank lines.
 - **Payment runs no longer hang in Windows scripts.** With input redirected from `NUL`, Windows reports a terminal, so `run --pay` waited on a prompt nobody could answer and crashed. SettleBot now checks for a real console, and an unanswered prompt always leaves the action pending. CI found this on its first run.
 - **CI** runs the tests and both kill tests (verification and payment) on Linux and Windows for every push and pull request.
+- **Web console** (`python main.py console`). Start a run, watch each line's checks, crash the worker and resume it, approve or reject, pay approved invoices, and read the cost ledger. Each run is its own `main.py run` process, so "Crash the worker" is a real kill. "Show the stored response" opens the raw API answer with the cited field highlighted. See [Run it](#run-it).
+- **Replay mode** (`--replay`). Reruns real recorded Crustdata responses with no key and no network. Ledger rows say `crustdata-replay` at ₹0, citations keep the original fetch time, and the report estimates what the same calls cost live. `scripts/export_cassette.py` turns any live run into a replay.
+- **Fixed: a second run could pay for the same call twice after a crash.** Stored responses were keyed without the run, so a second run with an identical response lost its cache row, and a crash in that run would have repeated the call. Keys now include the run; the regression test fails on the old code.
+- **Two approvers from ₹1,00,000.** A second `PAY` rule in `config.yaml`; the comment there now matches the code (the highest matching threshold decides).
 
 **Still open**
 
@@ -220,17 +235,34 @@ python scripts/demo.py --offline   # same flow on fixtures and a fake provider, 
 
 The demo runs five steps: verify and post the bank lines; `kill -9` mid-run and restart with the same run ID (shows postings = 2, the steps redone, the cached responses reused); invoice holds (fraud, duplicate, unknown vendor, lookalike domain, lookalike name); approve line 1 and pay, then pay again to show nothing changes; print the last cost-ledger rows. `scripts/demo.sh` is the same demo for bash. On Windows, if `pip.exe` is blocked, use `python -m pip install -r requirements.txt`.
 
-**Quickstart:**
+**Web console** (recommended):
+
+```bash
+python -m pip install -r requirements.txt
+python main.py console                     # http://127.0.0.1:8000
+python main.py console --demo              # public demo: replay and fixtures only, simulated payments
+```
+
+| Data mode | What it uses | Keys |
+| --- | --- | --- |
+| Recorded responses | Real Crustdata answers recorded on 22 Nov 2026 (`tests/fixtures/crustdata_recorded.json`) | None |
+| Test fixtures | Invented records that trigger every kind of hold; never a real check | None |
+| Live | Crustdata, plus Claude if `ANTHROPIC_API_KEY` is set; payments in Razorpay test mode if test keys are set | `.env` |
+
+Runs and their database live in `console_data/` (git-ignored). Payments go to a simulated provider unless the run is live and Razorpay test keys are set.
+
+**Quickstart (command line):**
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env    # add CRUSTDATA_API_KEY, ANTHROPIC_API_KEY (optional), RAZORPAY_KEY_ID/SECRET (test)
 
-python main.py tests/fixtures/pdf_example_bank_lines.json --run-id oct-2026-run1        # verify and post
+python main.py run tests/fixtures/pdf_example_bank_lines.json --run-id oct-2026-run1    # verify and post
 python main.py approve --run-id oct-2026-run1                                             # decision cards
 python main.py run tests/fixtures/pdf_example_bank_lines.json --run-id oct-2026-run1 --pay  # settle (test mode)
 python main.py report --run-id oct-2026-run1                                              # re-print report
+python main.py run tests/fixtures/pdf_example_bank_lines.json --run-id replay-1 --replay    # recorded responses, no keys
 ```
 
 **Tests** (offline, fixtures and recorded real responses):
@@ -259,7 +291,7 @@ python scripts/smoke_live.py      # live check of Crustdata, Claude and Razorpay
 ### Repository layout
 
 ```
-main.py                 CLI: run, approve, report
+main.py                 CLI: run, approve, report, console
 config.yaml             everything a live fix may change
 settlebot/
   runner.py             steps, checkpoints, settlement
@@ -273,8 +305,10 @@ settlebot/
   approvals.py          rules, decision cards
   payments.py           Razorpay Orders (test) and reconcile-before-retry
   ledger.py, report.py, pii_guard.py, normalize.py, accounts.py
-tests/                  unit tests, recorded Crustdata responses, fixtures
-scripts/                demo.py / demo.sh, kill_test.py, smoke_live.py
+  web/                  console: app.py (FastAPI API), workers.py (one process per run), static/ (page)
+tests/                  unit and console tests, recorded Crustdata responses, fixtures
+scripts/                demo.py / demo.sh, kill_test.py, smoke_live.py, export_cassette.py
+docs/screenshots/       console screenshots and the demo GIF
 architecture.mmd        system diagram
 data/vendor_master.json fictional placeholder until the client's records are in
 ```

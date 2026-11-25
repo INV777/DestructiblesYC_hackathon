@@ -53,6 +53,7 @@ class Fetched:
     units: float = 0.0
     unit_type: str | None = None
     cost_inr: float = 0.0
+    retrieved_at: str | None = None  # set by replays: when the response was really fetched
 
 
 class Source:
@@ -100,9 +101,11 @@ class Source:
                           cost_inr=got.cost_inr, latency_ms=ms, item_key=item_key, step=step,
                           attempt=attempt, detail=query_key)
             row = {
-                "evidence_id": sha256(f"{self.name}|{query_key}|{got.body}")[:24],
+                # Scoped to the run: the same response in another run is a separate row, so each
+                # run's cache (and its crash recovery) only ever depends on its own rows.
+                "evidence_id": sha256(f"{run_id}|{self.name}|{query_key}|{got.body}")[:24],
                 "run_id": run_id, "source": self.name, "query_key": query_key, "url": got.url,
-                "retrieved_at": now_iso(), "record_date": got.record_date,
+                "retrieved_at": got.retrieved_at or now_iso(), "record_date": got.record_date,
                 "body_sha256": sha256(got.body), "body": got.body,
             }
             store.save_evidence(row)

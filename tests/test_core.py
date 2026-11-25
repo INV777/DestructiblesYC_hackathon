@@ -142,3 +142,21 @@ def test_unverified_descriptor_that_resembles_known_payee_says_so(tmp_path, cfg)
     lines = {r["line"]: r for r in build_report(store, "sw")["lines"]}
     assert lines[2]["status"] == "CANNOT_VERIFY" and lines[2]["payee"] is None
     assert any("resembles known payee 'Swiggy Limited'" in m for m in lines[2]["missing"])
+
+
+def test_second_run_with_same_responses_keeps_its_own_cache(tmp_path, cfg):
+    """Regression: evidence ids ignored the run, so a second run's identical responses were dropped
+    (INSERT OR IGNORE) and a crash in that run would have paid for the same calls again."""
+    store = Store(tmp_path / "state.db")
+    for run_id in ("first", "second"):
+        Runner(store, cfg, run_id, EXAMPLE, {"sources": ["fake"], "out_dir": str(tmp_path / "out")}).run()
+    a = store.one("SELECT COUNT(*) AS n FROM evidence WHERE run_id='first'")["n"]
+    b = store.one("SELECT COUNT(*) AS n FROM evidence WHERE run_id='second'")["n"]
+    assert a > 0 and a == b
+    # A restart of the second run finds every response in its own cache: no new source calls.
+    before = store.one("SELECT COUNT(*) AS n FROM ledger WHERE run_id='second' AND cache_hit=0")["n"]
+    with store.tx() as c:
+        c.execute("DELETE FROM steps WHERE run_id='second' AND step IN ('resolve', 'decide', 'bank_check', 'post')")
+    Runner(store, cfg, "second", EXAMPLE, {"sources": ["fake"], "out_dir": str(tmp_path / "out")}).run()
+    after = store.one("SELECT COUNT(*) AS n FROM ledger WHERE run_id='second' AND cache_hit=0")["n"]
+    assert after == before
