@@ -41,9 +41,11 @@ payments:
   receipt_prefix: "sb_"     # receipt = prefix + 32 hex chars (Razorpay max is 40)
 
 approvals:
-  # One rule per line; the first matching rule decides how many approvers an action needs.
+  # One rule per line. Of the rules that match an action and amount, the one with the highest
+  # min_amount_inr decides how many different people must approve.
   rules:
     - {action: PAY, min_amount_inr: 0, approvers: 1}
+    - {action: PAY, min_amount_inr: 100000, approvers: 2}
     - {action: RELEASE_HOLD, min_amount_inr: 0, approvers: 1}
 
 vendor_master: data/vendor_master.json   # TODO: replace with the client's vendor master from the kit

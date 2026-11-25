@@ -10,3 +10,4 @@ state.db-*
 out/
 cost_ledger.jsonl
 .pytest_cache/
+console_data/

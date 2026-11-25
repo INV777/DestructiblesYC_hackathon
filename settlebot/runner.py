@@ -80,6 +80,8 @@ class Runner:
                 self.store.finish_step(self.run_id, key, step, out, effects)
                 self._save_elapsed()
                 done[step] = out
+                if self.options.get("pace"):  # demos only: let a viewer watch each step land
+                    time.sleep(float(self.options["pace"]))
             self.store.export_ledger_jsonl(self.run_id, self.ledger_path())
         status = "LIMIT_REACHED" if self.limit_hit else "DONE"
         self.store.set_run_status(self.run_id, status)

@@ -11,6 +11,7 @@ skipped, cached source responses are reused, and nothing is posted or paid twice
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from settlebot.config import load_config, load_dotenv
@@ -53,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
                           "(default cassette: tests/fixtures/crustdata_recorded.json). No keys, no cost, no Claude")
     run.add_argument("--slow", type=float, default=0.0,
                      help="fake and replay sources only: delay per call, for kill tests and demos")
+    run.add_argument("--pace", type=float, default=0.0, help="demos only: pause after each step, in seconds")
     run.add_argument("--no-llm", action="store_true", help="rules only, no Claude calls")
     run.add_argument("--pay", action="store_true", help="after verifying, settle approved actions (test mode)")
     run.add_argument("--pay-provider", default=None, help="razorpay_orders (default) | fake (tests only)")
@@ -71,17 +73,26 @@ def main(argv: list[str] | None = None) -> int:
     apr.add_argument("--reason", default=None)
     _common(apr)
 
+    con = sub.add_parser("console", help="start the web console (http://127.0.0.1:8000)")
+    con.add_argument("--host", default="127.0.0.1")
+    con.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8000)))
+    con.add_argument("--data-dir", default=None, help="where console runs are kept (default: console_data/)")
+    con.add_argument("--demo", action="store_true", help="public demo: replay and fixture data only")
+    con.add_argument("--config", default="config.yaml")
+
     rep = sub.add_parser("report", help="print the audit report for a run")
     rep.add_argument("--run-id", required=True)
     _common(rep)
 
     args = ap.parse_args(argv)
     load_dotenv()
+    if args.cmd == "console":
+        return _console(args)
     cfg = load_config(args.config)
     store = Store(args.db)
 
     if args.cmd == "run":
-        options = {"out_dir": args.out, "slow": args.slow, "no_llm": args.no_llm}
+        options = {"out_dir": args.out, "slow": args.slow, "no_llm": args.no_llm, "pace": args.pace}
         if args.fake and args.replay:
             print("error: choose --fake or --replay, not both", file=sys.stderr)
             return 2
@@ -142,6 +153,22 @@ def main(argv: list[str] | None = None) -> int:
     print_report(report)
     print_unit_economics(report["unit_economics"])
     print(f"report: {path}")
+    return 0
+
+
+def _console(args) -> int:
+    try:
+        import uvicorn
+
+        from settlebot.web.app import create_app
+    except ImportError as e:
+        print(f"error: the console needs fastapi and uvicorn ({e}). Run: python -m pip install -r requirements.txt",
+              file=sys.stderr)
+        return 2
+    app = create_app(data_dir=args.data_dir, config_path=args.config, demo=True if args.demo else None)
+    mode = "public demo" if app.state.demo else "local"
+    print(f"SettleBot console ({mode}) on http://{args.host}:{args.port}  (Ctrl+C to stop)")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 
 

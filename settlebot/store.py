@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS steps (
     PRIMARY KEY (run_id, item_key, step)
 );
 CREATE TABLE IF NOT EXISTS evidence (
-    evidence_id TEXT PRIMARY KEY,      -- sha256(source|query|body)[:24]
+    evidence_id TEXT PRIMARY KEY,      -- sha256(run|source|query|body)[:24]
     run_id TEXT NOT NULL,
     source TEXT NOT NULL,
     query_key TEXT NOT NULL,           -- cache key: same source + query reuses the response
