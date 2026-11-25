@@ -139,9 +139,13 @@ class Runner:
         dup = done["dedupe"]["duplicate_of_line"]
         res = done["resolve"]
         if dup is not None:
-            d = Decision(status=Status.HELD_DUPLICATE, related_line=dup,
-                         explanation=(f"Same date, descriptor and amount as line {dup}. "
-                                      "Held for approval as a possible duplicate charge."))
+            if item.kind == "invoice":
+                why = (f"Same vendor, invoice number and amount as line {dup}. "
+                       "Held for approval as a possible duplicate invoice.")
+            else:
+                why = (f"Same date, descriptor and amount as line {dup}. "
+                       "Held for approval as a possible duplicate charge.")
+            d = Decision(status=Status.HELD_DUPLICATE, related_line=dup, explanation=why)
         elif res.get("limit"):
             self.limit_hit = True
             d = Decision(status=Status.CANNOT_VERIFY, missing=[res["limit"]],
@@ -293,7 +297,10 @@ def settle_run(runner: Runner, provider, ask=None, approver: str | None = None) 
         for p in approvals.pending_actions(store, cfg, run_id):
             if any(h["approver"] == approver for h in p["have"]):
                 continue
-            yes, reason = ask(approvals.decision_card(p))
+            answer = ask(approvals.decision_card(p))
+            if answer is None:  # nobody answered: leave this and the rest pending
+                break
+            yes, reason = answer
             approvals.record(store, run_id, p["item"]["item_key"], p["action"], approver, yes, reason)
 
     for it in store.items(run_id):

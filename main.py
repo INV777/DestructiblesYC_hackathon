@@ -95,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"payment error: {e}", file=sys.stderr)
                 return 3
             approver = args.approver or getpass.getuser()
-            ask = _ask if sys.stdin.isatty() else None
+            ask = _ask if _has_terminal() else None
             counts = settle_run(runner, provider, ask=ask, approver=approver)
             print(f"settlement: {counts}")
             if counts["waiting"]:
@@ -116,10 +116,15 @@ def main(argv: list[str] | None = None) -> int:
             approvals.record(store, args.run_id, p["item"]["item_key"], p["action"], approver, args.yes, args.reason)
             print(f"{'approved' if args.yes else 'rejected'}: line {args.line} {p['action']} by {approver}")
         else:
+            recorded = 0
             for p in pending:
-                yes, reason = _ask(approvals.decision_card(p))
+                answer = _ask(approvals.decision_card(p))
+                if answer is None:
+                    break
+                yes, reason = answer
                 approvals.record(store, args.run_id, p["item"]["item_key"], p["action"], approver, yes, reason)
-            print(f"{len(pending)} decision(s) recorded by {approver}. Run again with --pay to settle.")
+                recorded += 1
+            print(f"{recorded} decision(s) recorded by {approver}. Run again with --pay to settle.")
 
     report = build_report(store, args.run_id)
     report["unit_economics"] = unit_economics(report, cfg)
@@ -130,10 +135,32 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _ask(card: str) -> tuple[bool, str | None]:
+def _has_terminal() -> bool:
+    """True only when a person can answer prompts.
+
+    On Windows, stdin redirected from NUL (for example by a CI runner or a script) reports
+    isatty() == True, so also ask the console whether this handle is really a console."""
+    if sys.stdin is None or not sys.stdin.isatty():
+        return False
+    if sys.platform == "win32":
+        import ctypes
+        import msvcrt
+        mode = ctypes.c_uint32()
+        handle = msvcrt.get_osfhandle(sys.stdin.fileno())
+        return bool(ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.byref(mode)))
+    return True
+
+
+def _ask(card: str) -> tuple[bool, str | None] | None:
+    """Show a decision card and read the answer. None means nobody answered (end of input):
+    the action stays pending, which is never the same as approving it."""
     print(card)
-    yes = input("Approve this action? [y/N] ").strip().lower() in ("y", "yes")
-    reason = None if yes else (input("Reason (optional): ").strip() or None)
+    try:
+        yes = input("Approve this action? [y/N] ").strip().lower() in ("y", "yes")
+        reason = None if yes else (input("Reason (optional): ").strip() or None)
+    except EOFError:
+        print("\nNo answer; left pending.")
+        return None
     return yes, reason
 
 

@@ -104,6 +104,24 @@ def test_invoices_bank_change_duplicate_and_unknown_vendor(tmp_path, cfg):
     assert store.one("SELECT COUNT(*) AS n FROM journal WHERE run_id='inv'")["n"] == 1
 
 
+def test_duplicate_explanation_fits_the_line_kind(tmp_path, cfg):
+    inv = {r["line"]: r for r in build_report(run_fake(tmp_path / "a", cfg, run_id="inv", input_path=INVOICES),
+                                               "inv")["lines"]}
+    assert "invoice number" in inv[3]["explanation"] and "descriptor" not in inv[3]["explanation"]
+    bank = {r["line"]: r for r in build_report(run_fake(tmp_path / "b", cfg), "t1")["lines"]}
+    assert "descriptor" in bank[3]["explanation"]
+
+
+def test_model_tokens_are_priced_in_rupees(tmp_path, cfg):
+    """Regression: a broken price block once logged every Claude call at INR 0, so the cost cap ignored it."""
+    from settlebot.ledger import Ledger
+    p = cfg["llm"]["price_inr_per_mtok"]
+    assert p["input"] > 0 and p["output"] > 0
+    ledger = Ledger(Store(tmp_path / "state.db"), "x", cfg)
+    assert ledger.llm_inr(1_000_000, 0) == pytest.approx(p["input"])
+    assert ledger.llm_inr(800, 120) > 0
+
+
 def test_lookalike_sender_domain_and_vendor_name_are_blocked(tmp_path, cfg):
     store = run_fake(tmp_path, cfg, run_id="lk", input_path=INVOICES)
     lines = {r["line"]: r for r in build_report(store, "lk")["lines"]}
