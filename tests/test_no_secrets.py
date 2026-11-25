@@ -32,3 +32,11 @@ def test_no_keys_in_tracked_files():
             if pat.search(text):
                 hits.append(f"{p.relative_to(ROOT)}: {pat.pattern}")
     assert not hits, "possible secrets in tracked files (move them to .env): " + "; ".join(hits)
+
+
+def test_env_file_is_not_tracked():
+    """.env holds real keys and must only exist on your own machine, never in git."""
+    tracked = {p.relative_to(ROOT).as_posix() for p in tracked_files()}
+    assert ".env" not in tracked, "remove it with: git rm --cached .env (then rotate the keys it held)"
+    if tracked:
+        assert ".env.example" in tracked, ".env.example (placeholders only) is the template new users copy"
