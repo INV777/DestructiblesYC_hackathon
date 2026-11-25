@@ -297,7 +297,10 @@ def settle_run(runner: Runner, provider, ask=None, approver: str | None = None) 
         for p in approvals.pending_actions(store, cfg, run_id):
             if any(h["approver"] == approver for h in p["have"]):
                 continue
-            yes, reason = ask(approvals.decision_card(p))
+            answer = ask(approvals.decision_card(p))
+            if answer is None:  # nobody answered: leave this and the rest pending
+                break
+            yes, reason = answer
             approvals.record(store, run_id, p["item"]["item_key"], p["action"], approver, yes, reason)
 
     for it in store.items(run_id):
