@@ -76,7 +76,7 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 
 | Requirement | How it is checked | Result |
 | --- | --- | --- |
-| Every `VERIFIED` fact is sourced: its quote appears verbatim in a response stored during the run | `grounding.py` on every fact; tests replay real Crustdata responses | 31 tests pass offline in about 4 s; CI runs them on every push |
+| Every `VERIFIED` fact is sourced: its quote appears verbatim in a response stored during the run | `grounding.py` on every fact; tests replay real Crustdata responses | 32 tests pass offline in about 5 s; CI runs them on every push |
 | Duplicates are never posted or paid; changed bank details are blocked; an unidentifiable payee gives `CANNOT_VERIFY`, not a guess | Fixture batches in `tests/` (`PAYTM*SHARMA TRD` must end as cannot verify) | Pass |
 | Restarts are exactly-once | `scripts/kill_test.py --rounds 20` (kills during verification) and `--pay --rounds 20` (kills during payment) | 20/20 rounds in each. In the payment test, 8 kills landed after the order reached Razorpay but before it was recorded; each restart adopted the order |
 | Limits hold: cost under `limits.max_cost_inr`, active time under `limits.max_time_seconds` | Guard checks before every paid call | Remaining lines fail closed to `CANNOT_VERIFY` |
@@ -91,6 +91,7 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 
 - **Claude calls are priced in rupees again.** A broken price block in `config.yaml` had logged every Claude call at ₹0, so the cost limit ignored model spend. Prices are now ₹9.33 in / ₹46.67 out per million tokens (USD 0.10 / 0.50 for `claude-haiku-5-5` × RBI reference rate 93.3461 on 19 Nov 2026), with a regression test.
 - **Duplicate invoices are explained correctly.** The hold reason now says "same vendor, invoice number and amount" for invoices, and keeps "same date, descriptor and amount" for bank lines.
+- **No silent approvals on Windows.** With input redirected from `NUL`, Windows reports a terminal, so `run --pay` waited on a prompt nobody could answer and crashed. SettleBot now checks for a real console, and an unanswered prompt always leaves the action pending. CI found this on its first run.
 - **CI** runs the tests and both kill tests (verification and payment) on Linux and Windows for every push and pull request.
 
 **Still open**

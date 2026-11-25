@@ -81,3 +81,11 @@ def test_fraud_hold_is_never_payable(env):
     pending = {p["item"]["line_no"]: p["action"] for p in approvals.pending_actions(store, cfg, "p1")}
     assert 2 not in pending            # HELD_FRAUD offers no PAY action at all
     assert pending.get(3) == "RELEASE_HOLD"
+
+
+def test_unanswered_prompt_leaves_actions_pending(env):
+    """End of input at the approval prompt (e.g. stdin from NUL on Windows) must never approve."""
+    cfg, store, runner, provider, key = env
+    counts = settle_run(runner, provider, ask=lambda card: None, approver="nobody")
+    assert counts["paid"] == 0 and orders(provider) == 0
+    assert approvals.pending_actions(store, cfg, "p1")
