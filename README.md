@@ -5,7 +5,7 @@
 **Track:** Buying and paying (ContextCon 05, BITS Pilani: *Services, Replaced*)
 **Client:** a mid-size Indian 3PL
 
-**Project history:** built by team DestructiblesYC at ContextCon 05 on 22 Nov 2026 (the submitted version is commit `2a3abed`). Work since then is listed under [After the hackathon](#after-the-hackathon).
+**Project history:** built by team DestructiblesYC at ContextCon 05 on 22 Nov 2026 (the submitted version is the [`Hackathon` release](https://github.com/INV777/Settlebot/releases/tag/Hackathon)). Work since then is listed under [After the hackathon](#after-the-hackathon).
 
 ![The SettleBot console: a run is crashed halfway through a lookup, resumed, and a line's evidence opened in the stored API response](docs/screenshots/console-demo.gif)
 
