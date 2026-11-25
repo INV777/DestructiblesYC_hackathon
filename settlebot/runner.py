@@ -12,7 +12,7 @@ from .entities import canonical, corroborates
 from .grounding import name_in_passage, passage_in_body
 from .ledger import Guard, Ledger, LimitReached
 from .models import Citation, Decision, LineItem, Status, sha256
-from .normalize import fingerprint, normalize_descriptor
+from .normalize import fingerprint, invoice_number_key, normalize_descriptor
 from .sources import SourceContext, build_sources
 from .sources.base import PermanentError
 from .store import Store
@@ -111,7 +111,19 @@ class Runner:
         row = self.store.one(
             "SELECT line_no FROM items WHERE run_id=? AND fingerprint=? AND line_no < ? ORDER BY line_no LIMIT 1",
             (self.run_id, fp, item.line_no))
-        return {"duplicate_of_line": row["line_no"] if row else None}, []
+        if row:
+            return {"duplicate_of_line": row["line_no"]}, []
+        # An invoice number is unique per vendor: the same number with a different amount is a revised
+        # or altered invoice, and paying both could pay twice. Hold it for a person.
+        inv_key = invoice_number_key(item)
+        if inv_key:
+            for r in self.store.q("SELECT line_no, raw_json FROM items WHERE run_id=? AND kind='invoice' "
+                                  "AND line_no < ? ORDER BY line_no", (self.run_id, item.line_no)):
+                earlier = LineItem.from_dict(r["line_no"], json.loads(r["raw_json"]))
+                if invoice_number_key(earlier) == inv_key:
+                    return {"duplicate_of_line": r["line_no"], "amount_differs": True,
+                            "earlier_amount_inr": earlier.amount_inr}, []
+        return {"duplicate_of_line": None}, []
 
     def step_resolve(self, item: LineItem, key: str, done: dict, attempt: int):
         if done["dedupe"]["duplicate_of_line"] is not None:
@@ -141,7 +153,11 @@ class Runner:
         dup = done["dedupe"]["duplicate_of_line"]
         res = done["resolve"]
         if dup is not None:
-            if item.kind == "invoice":
+            if done["dedupe"].get("amount_differs"):
+                why = (f"Same vendor and invoice number as line {dup}, but the amount is INR {item.amount_inr:,.2f} "
+                       f"instead of INR {done['dedupe']['earlier_amount_inr']:,.2f}. A revised or altered invoice: "
+                       "held for a person, so the same invoice is not paid twice.")
+            elif item.kind == "invoice":
                 why = (f"Same vendor, invoice number and amount as line {dup}. "
                        "Held for approval as a possible duplicate invoice.")
             else:

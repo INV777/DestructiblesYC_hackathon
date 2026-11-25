@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .entities import canonical
-from .lookalike import compare_domains, compare_names, email_domain
+from .lookalike import compare_domains, compare_names, core_name, email_domain
 from .models import Decision, LineItem, Status
 from .pii_guard import mask_account
 
@@ -83,8 +83,8 @@ def check_invoice(item: LineItem, decision: Decision, master: dict[str, dict[str
     if decision.status != Status.VERIFIED:
         return decision
     if vendor is None:
-        same = [v for v in master.values() if canonical(v["legal_name"]).replace(" LIMITED", "")
-                == canonical(invoice_name or "").replace(" LIMITED", "")]
+        names = {core_name(invoice_name or ""), core_name(decision.payee or "")} - {""}
+        same = [v for v in master.values() if core_name(v["legal_name"]) in names]
         decision.status = Status.CANNOT_VERIFY
         decision.missing = [f"Vendor '{item.vendor_id}' is not in the vendor master."]
         if same:
