@@ -122,6 +122,10 @@ class Store:
         self.conn.execute("PRAGMA synchronous=FULL")
         self.conn.executescript(SCHEMA)
 
+    def close(self) -> None:
+        """Release the file (Windows can't delete an open SQLite file)."""
+        self.conn.close()
+
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:
         self.conn.execute("BEGIN IMMEDIATE")

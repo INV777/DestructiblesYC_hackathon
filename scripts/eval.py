@@ -72,8 +72,11 @@ def run_case(case: dict, base_cfg: dict, tmp: Path) -> list[dict]:
     else:
         options.update({"sources": ["fake"], "fake_fixture": str(EVALS / "sources.json")})
     store = Store(tmp / f"{case['id']}.db")
-    Runner(store, cfg, case["id"], batch, options).run()
-    got = {r["line"]: r for r in build_report(store, case["id"])["lines"]}
+    try:
+        Runner(store, cfg, case["id"], batch, options).run()
+        got = {r["line"]: r for r in build_report(store, case["id"])["lines"]}
+    finally:
+        store.close()
     rows = []
     for i, exp in enumerate(case["expect"], start=1):
         outcome, problems = judge(exp, got[i])
@@ -127,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
     base = load_config(ROOT / "config.yaml")
     t0 = time.monotonic()
     rows: list[dict] = []
-    with tempfile.TemporaryDirectory(prefix="settlebot-eval-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="settlebot-eval-", ignore_cleanup_errors=True) as tmp:
         for case in cases:
             rows += run_case(case, base, Path(tmp))
     table, tot = scorecard(rows, time.monotonic() - t0)
