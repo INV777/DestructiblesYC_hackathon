@@ -1,0 +1,14 @@
+{
+  "_comment": "Fictional vendor master for the evaluation suite only.",
+  "vendors": [
+    {"vendor_id": "V101", "legal_name": "Tarangini Freight Private Limited", "gstin": null,
+     "bank_account": {"account_number": "60100200300101", "ifsc": "HDFC0001234", "name": "TARANGINI FREIGHT PVT LTD"},
+     "domains": ["taranginifreight.in"]},
+    {"vendor_id": "V102", "legal_name": "Mekhala Roadlines LLP", "gstin": null,
+     "bank_account": {"account_number": "70200300400102", "ifsc": "SBIN0004567", "name": "MEKHALA ROADLINES LLP"},
+     "domains": ["mekhalaroadlines.com"]},
+    {"vendor_id": "V103", "legal_name": "Parvati Fuels Limited", "gstin": null,
+     "bank_account": {"account_number": "80300400500103", "ifsc": "ICIC0007890", "name": "PARVATI FUELS LIMITED"},
+     "domains": ["parvatifuels.co.in"]}
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "_comment": "Fictional companies and records for the evaluation suite only. Never a real check.",
+  "TARANGINI FREIGHT": {
+    "legal_name": "Tarangini Freight Private Limited",
+    "passage": "Tarangini Freight Private Limited is a road freight carrier based in Nashik",
+    "field": "registry.legal_name", "url": "fake://registry/tarangini-freight", "record_date": "2026-08-14",
+    "category_hint": "freight"
+  },
+  "TARANGINI LOGISTICS": {
+    "legal_name": "Tarangini Logistics Private Limited",
+    "passage": "Tarangini Logistics Private Limited runs warehouses in Nashik",
+    "field": "registry.legal_name", "url": "fake://registry/tarangini-logistics", "record_date": "2026-08-14",
+    "category_hint": "logistics"
+  },
+  "MEKHALA ROADLINES": {
+    "legal_name": "Mekhala Roadlines LLP",
+    "passage": "Mekhala Roadlines LLP operates full-truckload trucking services",
+    "field": "registry.legal_name", "url": "fake://registry/mekhala", "record_date": "2026-07-02",
+    "category_hint": "trucking"
+  },
+  "USHNIK CLOUD": {
+    "legal_name": "Ushnik Cloud Private Limited",
+    "passage": "Ushnik Cloud Private Limited provides cloud hosting to small businesses",
+    "field": "registry.legal_name", "url": "fake://registry/ushnik", "record_date": "2026-06-11",
+    "category_hint": "hosting"
+  },
+  "PARVATI FUELS": {
+    "legal_name": "Parvati Fuels Limited",
+    "passage": "Parvati Fuels Limited operates diesel pumps on the Mumbai-Nashik highway",
+    "field": "registry.legal_name", "url": "fake://registry/parvati", "record_date": "2026-05-20",
+    "category_hint": "diesel fuel"
+  },
+  "VIDURA LEGAL": {
+    "legal_name": "Vidura Legal Associates LLP",
+    "passage": "Vidura Legal Associates LLP is a law firm in Pune",
+    "field": "registry.legal_name", "url": "fake://registry/vidura", "record_date": "2026-04-30",
+    "category_hint": "legal services"
+  },
+  "SAMUDRA CANTEEN": {
+    "legal_name": "Samudra Canteen Services Private Limited",
+    "passage": "A canteen operator serving office campuses in Pune",
+    "field": "registry.description", "url": "fake://registry/samudra", "record_date": "2026-03-15",
+    "category_hint": "meals"
+  }
+}

@@ -35,11 +35,19 @@ def normalize_descriptor(desc: str, cfg: dict[str, Any]) -> dict[str, Any]:
     return {"merchant": merchant, "processor": processor, "city": city, "descriptor_norm": clean(desc)}
 
 
+def invoice_number_key(item: LineItem) -> str | None:
+    """Vendor + normalised invoice number, or None for bank lines and invoices without a number."""
+    if item.kind != "invoice" or not item.invoice_no:
+        return None
+    inv = re.sub(r"[^A-Z0-9]", "", str(item.invoice_no).upper())
+    inv = re.sub(r"(?<!\d)0+(?=\d)", "", inv)  # INV-0101 == INV-101, but INV-1001 stays distinct
+    return f"{item.vendor_id}|{inv}"
+
+
 def fingerprint(item: LineItem, descriptor_norm: str) -> str:
     """Bank lines: same date + descriptor + amount. Invoices: same vendor + invoice number + amount
     (a re-sent invoice often carries a new date, so the date is left out)."""
-    if item.kind == "invoice" and item.invoice_no:
-        inv = re.sub(r"[^A-Z0-9]", "", str(item.invoice_no).upper())
-        inv = re.sub(r"(?<!\d)0+(?=\d)", "", inv)  # INV-0101 == INV-101, but INV-1001 stays distinct
-        return sha256(f"invoice|{item.vendor_id}|{inv}|{item.amount_paise}")[:32]
+    key = invoice_number_key(item)
+    if key:
+        return sha256(f"invoice|{key}|{item.amount_paise}")[:32]
     return sha256(f"{item.kind}|{item.date}|{descriptor_norm}|{item.amount_paise}")[:32]

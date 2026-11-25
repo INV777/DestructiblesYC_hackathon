@@ -85,6 +85,11 @@ def compare_domains(known: str, candidate: str) -> str | None:
     return None
 
 
+def core_name(name: str) -> str:
+    """The name without legal forms: 'Tarangini Freight Private Limited' -> 'TARANGINI FREIGHT'."""
+    return " ".join(t for t in canonical(name).split() if t not in _LEGAL_FORMS)
+
+
 def compare_names(known: str, candidate: str) -> str | None:
     """Return why a vendor name imitates a known vendor, or None if same or unrelated."""
     ck, cc = canonical(known), canonical(candidate)

@@ -87,11 +87,19 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 - **Cost ledger and limits:** every external call is logged in INR; past the cost or time limit, remaining lines fail closed.
 - **PII masking** before any text reaches Claude.
 
+### Evaluation suite
+
+[`evals/cases.yaml`](evals/cases.yaml) holds 32 hard cases (46 lines), each with the answer a careful AP clerk would give: processor prefixes, double charges and monthly repeats, zero-padded and re-sent invoices, new bank accounts, lookalike names (swapped letters, `1` for `i`, Cyrillic letters, another legal form), lookalike sender domains, unknown vendors, limits, and the problem statement on real recorded Crustdata responses. `python scripts/eval.py` runs them through the real pipeline in about 1.5 s and scores **+1** for correct, **0** for an honest "cannot verify", and **−2** for anything else. An answer is **unsafe** when SettleBot says VERIFIED and the right answer was anything else. CI fails on any wrong or unsafe answer.
+
+Current score: **45 of 46**, with no wrong or unsafe answers ([full results](evals/RESULTS.md)). The one miss is a documented limit: a city that `descriptor.city_tokens` doesn't list stays in the merchant name, so the line is held rather than guessed.
+
+The suite earned its place on its first run: it found a re-sent invoice with a changed amount that was VERIFIED and payable (now held), and a missing "same vendor under a new ID" note (now given).
+
 ### Pass mark, and how we check it
 
 | Requirement | How it is checked | Result |
 | --- | --- | --- |
-| Every `VERIFIED` fact is sourced: its quote appears verbatim in a response stored during the run | `grounding.py` on every fact; tests replay real Crustdata responses | 42 tests pass offline in about 20 s; CI runs them on every push |
+| Every `VERIFIED` fact is sourced: its quote appears verbatim in a response stored during the run | `grounding.py` on every fact; tests replay real Crustdata responses | 46 tests and the 32-case evaluation suite pass offline; CI runs both on every push |
 | Duplicates are never posted or paid; changed bank details are blocked; an unidentifiable payee gives `CANNOT_VERIFY`, not a guess | Fixture batches in `tests/` (`PAYTM*SHARMA TRD` must end as cannot verify) | Pass |
 | Restarts are exactly-once | `scripts/kill_test.py --rounds 20` (kills during verification) and `--pay --rounds 20` (kills during payment) | 20/20 rounds in each. In the payment test, 8 kills landed after the order reached Razorpay but before it was recorded; each restart adopted the order |
 | Limits hold: cost under `limits.max_cost_inr`, active time under `limits.max_time_seconds` | Guard checks before every paid call | Remaining lines fail closed to `CANNOT_VERIFY` |
@@ -111,6 +119,7 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 - **Web console** (`python main.py console`). Start a run, watch each line's checks, crash the worker and resume it, approve or reject, pay approved invoices, and read the cost ledger. Each run is its own `main.py run` process, so "Crash the worker" is a real kill. "Show the stored response" opens the raw API answer with the cited field highlighted. See [Run it](#run-it).
 - **Replay mode** (`--replay`). Reruns real recorded Crustdata responses with no key and no network. Ledger rows say `crustdata-replay` at ₹0, citations keep the original fetch time, and the report estimates what the same calls cost live. `scripts/export_cassette.py` turns any live run into a replay.
 - **Fixed: a second run could pay for the same call twice after a crash.** Stored responses were keyed without the run, so a second run with an identical response lost its cache row, and a crash in that run would have repeated the call. Keys now include the run; the regression test fails on the old code.
+- **Evaluation suite** with a score in CI ([above](#evaluation-suite)). Its first run found two problems, both fixed with regression tests: an invoice re-sent with the same number and a **different amount** was VERIFIED and payable (it is now held for a person, with both amounts in the reason), and an invoice under a new vendor ID with a known vendor's exact name was held without saying so (names are now compared without any legal form).
 - **Two approvers from ₹1,00,000.** A second `PAY` rule in `config.yaml`; the comment there now matches the code (the highest matching threshold decides).
 
 **Still open**
@@ -123,7 +132,6 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 - **Match on registry IDs, not names.** Use GSTIN, PAN and CIN as the join key between invoice, vendor master and live sources (the vendor master already has a `gstin` field).
 - **Bank-account name check.** Confirm that the account holder's name matches the vendor before the first payment to new bank details, using a provider's account-validation API.
 - **Continuous re-checks.** Re-verify vendors on a schedule with Crustdata Watch, so a status change raises a hold before the next payment run.
-- **Trap evaluation suite.** A scored set of hard cases on recorded responses (correct +1, cannot verify 0, wrong −2) that runs in under 30 seconds on every commit.
 - **Outcome billing.** Turn the per-run unit-economics line into actual metered billing: charge only for lines finished without a person.
 - **Production payments.** Move from Razorpay test mode to live settlement, behind the same approval rules and reconcile-before-retry logic.
 
@@ -313,7 +321,8 @@ settlebot/
   ledger.py, report.py, pii_guard.py, normalize.py, accounts.py
   web/                  console: app.py (FastAPI API), workers.py (one process per run), static/ (page)
 tests/                  unit and console tests, recorded Crustdata responses, fixtures
-scripts/                demo.py / demo.sh, kill_test.py, smoke_live.py, export_cassette.py
+evals/                  evaluation cases, fictional sources and vendor master, RESULTS.md
+scripts/                demo.py / demo.sh, kill_test.py, smoke_live.py, export_cassette.py, eval.py
 docs/screenshots/       console screenshots and the demo GIF
 architecture.mmd        system diagram
 data/vendor_master.json fictional placeholder until the client's records are in

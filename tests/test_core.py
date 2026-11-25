@@ -160,3 +160,29 @@ def test_second_run_with_same_responses_keeps_its_own_cache(tmp_path, cfg):
     Runner(store, cfg, "second", EXAMPLE, {"sources": ["fake"], "out_dir": str(tmp_path / "out")}).run()
     after = store.one("SELECT COUNT(*) AS n FROM ledger WHERE run_id='second' AND cache_hit=0")["n"]
     assert after == before
+
+
+def test_same_invoice_number_with_new_amount_is_held(tmp_path, cfg):
+    """Found by the evaluation suite: a re-sent invoice with a changed amount was VERIFIED and payable."""
+    lines = [
+        {"kind": "invoice", "invoice_no": "INV-101", "vendor_id": "V001", "date": "2026-10-05",
+         "description": "VRL Logistics", "amount_inr": 48000,
+         "bank_account": {"account_number": "50100123450001", "ifsc": "HDFC0000123"}},
+        {"kind": "invoice", "invoice_no": "INV-0101", "vendor_id": "V001", "date": "2026-10-20",
+         "description": "VRL Logistics", "amount_inr": 52000,
+         "bank_account": {"account_number": "50100123450001", "ifsc": "HDFC0000123"}},
+    ]
+    path = tmp_path / "revised.json"
+    path.write_text(json.dumps(lines), encoding="utf-8")
+    store = run_fake(tmp_path, cfg, run_id="rev", input_path=path)
+    rows = {r["line"]: r for r in build_report(store, "rev")["lines"]}
+    assert rows[1]["status"] == "VERIFIED"
+    assert rows[2]["status"] == "HELD_DUPLICATE" and rows[2]["related_line"] == 1
+    assert "52,000.00" in rows[2]["explanation"] and "48,000.00" in rows[2]["explanation"]
+
+
+def test_known_name_under_new_vendor_id_says_so(tmp_path, cfg):
+    """Found by the evaluation suite: the note only stripped 'Limited', not 'Private Limited' or 'LLP'."""
+    from settlebot.lookalike import core_name
+    assert core_name("Tarangini Freight Private Limited") == core_name("Tarangini Freight") == "TARANGINI FREIGHT"
+    assert core_name("Mekhala Roadlines LLP") == "MEKHALA ROADLINES"
