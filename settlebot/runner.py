@@ -139,9 +139,13 @@ class Runner:
         dup = done["dedupe"]["duplicate_of_line"]
         res = done["resolve"]
         if dup is not None:
-            d = Decision(status=Status.HELD_DUPLICATE, related_line=dup,
-                         explanation=(f"Same date, descriptor and amount as line {dup}. "
-                                      "Held for approval as a possible duplicate charge."))
+            if item.kind == "invoice":
+                why = (f"Same vendor, invoice number and amount as line {dup}. "
+                       "Held for approval as a possible duplicate invoice.")
+            else:
+                why = (f"Same date, descriptor and amount as line {dup}. "
+                       "Held for approval as a possible duplicate charge.")
+            d = Decision(status=Status.HELD_DUPLICATE, related_line=dup, explanation=why)
         elif res.get("limit"):
             self.limit_hit = True
             d = Decision(status=Status.CANNOT_VERIFY, missing=[res["limit"]],
