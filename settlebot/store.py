@@ -122,6 +122,12 @@ class Store:
         self.conn.execute("PRAGMA synchronous=FULL")
         self.conn.executescript(SCHEMA)
 
+    def delete_run(self, run_id: str) -> None:
+        """Remove every row of one run (public demo clean-up)."""
+        with self.tx() as c:
+            for table in ("ledger", "payments", "approvals", "journal", "evidence", "steps", "items", "runs"):
+                c.execute(f"DELETE FROM {table} WHERE run_id=?", (run_id,))
+
     def close(self) -> None:
         """Release the file (Windows can't delete an open SQLite file)."""
         self.conn.close()

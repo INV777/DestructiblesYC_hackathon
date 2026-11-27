@@ -24,9 +24,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from settlebot.config import load_config  # noqa: E402
+from settlebot.importer import analyse, read_tables  # noqa: E402
+from settlebot.lookalike import core_name  # noqa: E402
 from settlebot.report import build_report  # noqa: E402
 from settlebot.runner import Runner  # noqa: E402
 from settlebot.store import Store  # noqa: E402
+from settlebot.vendors import load_vendor_master  # noqa: E402
 
 EVALS = ROOT / "evals"
 POINTS = {"correct": 1, "abstained": 0, "wrong": -2}
@@ -61,16 +64,41 @@ def judge(exp: dict, got: dict) -> tuple[str, list[str]]:
     return "wrong", problems
 
 
+def read_file_case(case: dict, cfg: dict) -> tuple[list[dict], list[str]]:
+    """A messy file read with automatic choices only (no person's edits). Returns (lines, problems)."""
+    path = ROOT / case["file"]
+    known = {core_name(v["legal_name"]): vid for vid, v in load_vendor_master(cfg).items()}
+    res = analyse(read_tables(path.read_bytes(), path.name), path.name, known_vendors=known)
+    problems = list(res.problems)
+    for k, want in (case.get("read") or {}).items():
+        got = getattr(res, k)
+        if got != want:
+            problems.append(f"read {k}={got!r}, expected {want!r}")
+    if len(res.lines) != len(case["expect"]):
+        problems.append(f"read {len(res.lines)} lines, expected {len(case['expect'])}")
+    return res.lines, problems
+
+
 def run_case(case: dict, base_cfg: dict, tmp: Path) -> list[dict]:
     cfg = merge(base_cfg, case.get("config", {}))
-    cfg["vendor_master"] = str(EVALS / "vendor_master.json")
+    cfg["vendor_master"] = str(ROOT / case["vendor_master"]) if case.get("vendor_master") \
+        else str(EVALS / "vendor_master.json")
+    read_problems: list[str] = []
+    lines = case.get("lines")
+    if case.get("file"):
+        lines, read_problems = read_file_case(case, cfg)
+    if read_problems:  # a file read wrongly fails every line of its case
+        return [{"case": case["id"], "category": case["category"], "line": i, "expected": e["status"], "got": "-",
+                 "outcome": "wrong", "problems": read_problems, "unsafe": False, "known_gap": case.get("known_gap")}
+                for i, e in enumerate(case["expect"], start=1)]
     batch = tmp / f"{case['id']}.json"
-    batch.write_text(json.dumps(case["lines"], ensure_ascii=False), encoding="utf-8")
+    batch.write_text(json.dumps(lines, ensure_ascii=False), encoding="utf-8")
     options = {"no_llm": True, "out_dir": str(tmp / "out")}
     if case.get("mode") == "replay":
         options["replay"] = True
     else:
-        options.update({"sources": ["fake"], "fake_fixture": str(EVALS / "sources.json")})
+        fixture = ROOT / case["fixture"] if case.get("fixture") else EVALS / "sources.json"
+        options.update({"sources": ["fake"], "fake_fixture": str(fixture)})
     store = Store(tmp / f"{case['id']}.db")
     try:
         Runner(store, cfg, case["id"], batch, options).run()

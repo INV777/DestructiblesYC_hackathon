@@ -135,7 +135,7 @@ def test_demo_mode_never_allows_live(tmp_path, monkeypatch):
         info = c.get("/api/info").json()
         assert info["demo"] and not info["modes"]["live"]["available"] and info["payments"] == "simulated provider"
         assert c.post("/api/runs", json={"sample": "bank-lines", "mode": "live"}).status_code == 400
-        too_many = [{"date": "2026-10-01", "description": "X", "amount_inr": 1}] * 51
+        too_many = [{"date": "2026-10-01", "description": "X", "amount_inr": 1}] * 301
         assert c.post("/api/runs", json={"lines": too_many, "mode": "fixtures"}).status_code == 413
         assert c.get("/").status_code == 200 and "SettleBot" in c.get("/").text
 

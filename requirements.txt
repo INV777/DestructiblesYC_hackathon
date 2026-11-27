@@ -1,6 +1,9 @@
 pyyaml>=6.0
 requests>=2.31
 anthropic>=0.40
+# reading Excel files people upload (offline)
+openpyxl>=3.1
+xlrd>=2.0
 # web console (python main.py console)
 fastapi>=0.115
 uvicorn>=0.30
