@@ -20,4 +20,4 @@ Lines not answered correctly:
 
 - `bank-city-not-in-list` line 1: status CANNOT_VERIFY, expected VERIFIED; payee None, expected 'Parvati Fuels Limited'; account None, expected 6210.
 
-83 lines in 1.7 s, offline (fixtures and recorded Crustdata responses).
+83 lines in 1.6 s, offline (fixtures and recorded Crustdata responses).

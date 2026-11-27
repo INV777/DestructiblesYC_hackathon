@@ -2,7 +2,7 @@
 """Run the evaluation suite (evals/cases.yaml) through the real pipeline and score it.
 
   python scripts/eval.py                # print the scorecard; exit 1 on any wrong or unsafe answer
-  python scripts/eval.py --write        # also write evals/RESULTS.md
+  python scripts/eval.py --write        # also write evals/RESULTS.md and evals/badge.json
 
 +1 correct, 0 for an honest "cannot verify", -2 for any other wrong answer. UNSAFE means SettleBot
 said VERIFIED when the right answer was anything else. Offline: fixtures and recorded responses only.
@@ -146,9 +146,17 @@ def scorecard(rows: list[dict], seconds: float) -> tuple[str, dict]:
     return "\n".join(lines), tot
 
 
+def badge(tot: dict) -> dict:
+    """The README's evaluation badge (a shields.io endpoint), so the number shown is the number measured."""
+    clean = tot["wrong"] == 0 and tot["unsafe"] == 0
+    return {"schemaVersion": 1, "label": "evaluation",
+            "message": f"{tot['score']} of {tot['lines']} right, {tot['unsafe']} unsafe",
+            "color": "2e7d32" if clean else "b3261e"}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--write", action="store_true", help="write evals/RESULTS.md")
+    ap.add_argument("--write", action="store_true", help="write evals/RESULTS.md and the README badge")
     ap.add_argument("--case", action="append", help="run only these case ids")
     args = ap.parse_args(argv)
 
@@ -169,6 +177,13 @@ def main(argv: list[str] | None = None) -> int:
                 "-2 for any other wrong answer. Unsafe: SettleBot said VERIFIED when the right answer was "
                 "anything else.\n\n")
         (EVALS / "RESULTS.md").write_text(head + table + "\n", encoding="utf-8")
+        (EVALS / "badge.json").write_text(json.dumps(badge(tot), indent=1) + "\n", encoding="utf-8")
+    elif not args.case and (EVALS / "badge.json").exists():
+        shown = json.loads((EVALS / "badge.json").read_text(encoding="utf-8"))
+        if shown != badge(tot):
+            print(f"\nThe README badge says \"{shown['message']}\" but this run measured "
+                  f"\"{badge(tot)['message']}\". Run python scripts/eval.py --write and commit the result.")
+            return 1
     gated = [r for r in rows if not r["known_gap"] and (r["outcome"] == "wrong" or r["unsafe"])]
     return 1 if gated else 0
 
