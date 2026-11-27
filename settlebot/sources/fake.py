@@ -23,6 +23,9 @@ class FakeSource(Source):
     def lookup(self, query, *, item_key, step, attempt):
         merchant = query["merchant"].upper()
         rec = self.records.get(merchant)
+        if rec is None:  # "VRL LOGISTICS LIMITED" finds the "VRL LOGISTICS" record, as a registry lookup would
+            from ..lookalike import core_name
+            rec = self.records.get(core_name(merchant))
 
         def call() -> Fetched:
             slow = float(self.ctx.options.get("slow", 0))

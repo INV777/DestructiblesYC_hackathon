@@ -8,6 +8,10 @@
 # expect: status, and optionally payee, account (code), related_line, says (text in the reason).
 # config: overrides merged into config.yaml for that case only.
 # mode: fixtures (default, evals/sources.json) or replay (real recorded Crustdata responses).
+# file: a raw export read by the importer with automatic choices only (no person's edits) instead of
+#   `lines`; `read` checks what the importer chose. A file read wrongly fails every line of its case.
+# vendor_master: use another vendor master (default evals/vendor_master.json).
+# fixture: use another fixture file for mode fixtures (default evals/sources.json).
 # known_gap: set when the current code gets it wrong on purpose-built evidence; shown, not gated.
 
 - id: bank-processor-prefix
@@ -324,3 +328,107 @@
     - {status: VERIFIED, payee: Amazon Web Services EMEA SARL, account: "6420"}
     - {status: HELD_DUPLICATE, related_line: 2}
     - {status: CANNOT_VERIFY}
+
+- id: file-withdrawal-deposit-xls
+  category: Reading messy files
+  about: Old Excel (.xls) with account details above the table, Withdrawal and Deposit columns, and totals below.
+  mode: replay
+  file: tests/fixtures/imports/statement_withdrawal_deposit.xls
+  read: {kind: bank_line, header_row: 7, amount_mode: debit_column, money_in: 2}
+  expect:
+    - {status: VERIFIED, payee: Swiggy Limited, account: "6110"}
+    - {status: VERIFIED, payee: Amazon Web Services EMEA SARL, account: "6420"}
+    - {status: HELD_DUPLICATE, related_line: 2}
+    - {status: CANNOT_VERIFY}
+    - {status: CANNOT_VERIFY}
+
+- id: file-drcr-semicolon-csv
+  category: Reading messy files
+  about: Semicolon CSV in Windows encoding, one Amount column with a Dr/Cr column, 'Rs.' in the amounts.
+  mode: replay
+  file: tests/fixtures/imports/statement_drcr_semicolon.csv
+  read: {amount_mode: drcr, money_in: 2}
+  expect:
+    - {status: VERIFIED, payee: Swiggy Limited, account: "6110"}
+    - {status: VERIFIED, payee: Amazon Web Services EMEA SARL, account: "6420"}
+    - {status: HELD_DUPLICATE, related_line: 2}
+    - {status: CANNOT_VERIFY}
+    - {status: CANNOT_VERIFY}
+
+- id: file-signed-two-sheets-xlsx
+  category: Reading messy files
+  about: Excel with a summary sheet first, title rows, real Excel dates and one signed Amount column.
+  mode: replay
+  file: tests/fixtures/imports/statement_signed_two_sheets.xlsx
+  read: {sheet: Transactions, header_row: 4, amount_mode: signed}
+  expect:
+    - {status: VERIFIED, payee: Swiggy Limited, account: "6110"}
+    - {status: VERIFIED, payee: Amazon Web Services EMEA SARL, account: "6420"}
+    - {status: HELD_DUPLICATE, related_line: 2}
+    - {status: CANNOT_VERIFY}
+    - {status: CANNOT_VERIFY}
+
+- id: file-html-disguised-xls
+  category: Reading messy files
+  about: "A bank '.xls' that is really a web page with two tables, with DR and CR columns."
+  mode: replay
+  file: tests/fixtures/imports/statement_html_disguised.xls
+  read: {sheet: Table 2, amount_mode: debit_column}
+  expect:
+    - {status: VERIFIED, payee: Swiggy Limited, account: "6110"}
+    - {status: VERIFIED, payee: Amazon Web Services EMEA SARL, account: "6420"}
+    - {status: HELD_DUPLICATE, related_line: 2}
+    - {status: CANNOT_VERIFY}
+    - {status: CANNOT_VERIFY}
+
+- id: file-unicode-text
+  category: Reading messy files
+  about: Excel's 'Unicode Text' (UTF-16, tab separated) with US month-first dates.
+  mode: replay
+  file: tests/fixtures/imports/statement_unicode_text.txt
+  read: {day_first: false, day_first_certain: true}
+  expect:
+    - {status: VERIFIED, payee: Swiggy Limited, account: "6110"}
+    - {status: VERIFIED, payee: Amazon Web Services EMEA SARL, account: "6420"}
+    - {status: HELD_DUPLICATE, related_line: 2}
+    - {status: CANNOT_VERIFY}
+    - {status: CANNOT_VERIFY}
+
+- id: file-no-header-csv
+  category: Reading messy files
+  about: "No header row: columns found from the numbers, because the balance moves by exactly each amount."
+  mode: replay
+  file: tests/fixtures/imports/statement_no_header.csv
+  read: {header_row: null, amount_mode: signed}
+  expect:
+    - {status: VERIFIED, payee: Swiggy Limited, account: "6110"}
+    - {status: VERIFIED, payee: Amazon Web Services EMEA SARL, account: "6420"}
+    - {status: HELD_DUPLICATE, related_line: 2}
+    - {status: CANNOT_VERIFY}
+    - {status: CANNOT_VERIFY}
+
+- id: file-ambiguous-dates
+  category: Reading messy files
+  about: No day above 12, so the date order is flagged for a person; day first is assumed meanwhile.
+  mode: replay
+  file: tests/fixtures/imports/statement_ambiguous_dates.csv
+  read: {day_first: true, day_first_certain: false}
+  expect:
+    - {status: VERIFIED, payee: Swiggy Limited}
+    - {status: VERIFIED, payee: Amazon Web Services EMEA SARL}
+    - {status: CANNOT_VERIFY}
+
+- id: file-invoice-register-xlsx
+  category: Reading messy files
+  about: >-
+    An Excel bill register (Bill No, Supplier, Supplier Code). A re-sent bill is held, changed bank details are
+    held, and a bill without a supplier code gets its vendor ID from an exact name match.
+  file: tests/fixtures/imports/invoice_register.xlsx
+  vendor_master: data/vendor_master.json
+  fixture: tests/fixtures/fake_sources.json
+  read: {kind: invoice}
+  expect:
+    - {status: VERIFIED, payee: VRL Logistics Limited}
+    - {status: HELD_FRAUD}
+    - {status: HELD_DUPLICATE, related_line: 1}
+    - {status: VERIFIED, payee: VRL Logistics Limited}
