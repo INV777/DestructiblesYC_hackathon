@@ -438,7 +438,8 @@ def analyse(sheets: list[Sheet], filename: str, choices: dict[str, Any] | None =
     body = rows[body_start:]
     columns = []
     for i in range(width):
-        sample = next((_text(r[i]) for r in body if i < len(r) and _text(r[i])), "")
+        sample = next((_text(r[i]) for r in body if i < len(r) and _text(r[i])
+                       and not SUMMARY_ROW.search(" ".join(_text(c) for c in r))), "")
         columns.append({"index": i, "letter": _col_letter(i), "header": _text(headers[i]) or f"Column {_col_letter(i)}",
                         "sample": sample[:40]})
     col = lambda i: [r[i] if i < len(r) else "" for r in body]  # noqa: E731

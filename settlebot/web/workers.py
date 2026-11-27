@@ -52,11 +52,15 @@ class Paths:
         return self.data / "runs"
 
     @property
+    def imports(self) -> Path:
+        return self.data / "imports"
+
+    @property
     def provider_db(self) -> Path:
         return self.data / "fake_provider.db"
 
     def make(self) -> None:
-        for p in (self.data, self.out, self.uploads, self.meta):
+        for p in (self.data, self.out, self.uploads, self.meta, self.imports):
             p.mkdir(parents=True, exist_ok=True)
 
 
@@ -68,10 +72,14 @@ class Job:
     log: Any = None
 
 
+API_KEY_NAMES = ("CRUSTDATA_API_KEY", "ANTHROPIC_API_KEY", "RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET")
+
+
 @dataclass
 class Workers:
     paths: Paths
     config_path: Path
+    keyless: bool = False  # public demo: workers never see an API key, so they cannot spend anything
     jobs: dict[str, Job] = field(default_factory=dict)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -108,6 +116,8 @@ class Workers:
             cmd.append("--replay")
         elif mode == "fixtures":
             cmd.append("--fake")
+        if self.keyless:
+            cmd.append("--no-llm")
         if meta.get("slow") and mode != "live":
             cmd += ["--slow", str(SLOW_CALL_SECONDS), "--pace", str(SLOW_STEP_PAUSE_SECONDS)]
         if settle:
@@ -126,6 +136,8 @@ class Workers:
             log.write(f"\n--- {'settle' if settle else 'run'} started {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
             log.flush()
             env = dict(os.environ, PYTHONIOENCODING="utf-8")
+            if self.keyless:  # set to empty so a .env file can't fill them back in either
+                env.update({k: "" for k in API_KEY_NAMES})
             proc = subprocess.Popen(self.command(meta, settle), cwd=str(ROOT), stdin=subprocess.DEVNULL,
                                     stdout=log, stderr=subprocess.STDOUT, env=env)
             self.jobs[meta["run_id"]] = Job(proc, "settle" if settle else "run", time.time(), log)
@@ -153,6 +165,14 @@ class Workers:
     def running_count(self) -> int:
         with self.lock:
             return sum(1 for j in self.jobs.values() if j.proc.poll() is None)
+
+    def forget(self, run_id: str) -> None:
+        """Kill any worker and delete the run's metadata and log (its database rows are the caller's)."""
+        self.kill(run_id)
+        with self.lock:
+            self.jobs.pop(run_id, None)
+        for p in (self.meta_path(run_id), self.paths.meta / f"{run_id}.log"):
+            p.unlink(missing_ok=True)
 
     def log_tail(self, run_id: str, chars: int = 1500) -> str:
         p = self.paths.meta / f"{run_id}.log"

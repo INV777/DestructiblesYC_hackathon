@@ -20,6 +20,8 @@ python main.py console            # then open http://127.0.0.1:8000
 
 Start a run on "Bank lines from the problem statement" with recorded responses, crash the worker halfway, resume it, then open a line to see the exact passage behind each fact. The recorded responses are real Crustdata API answers from 22 Nov 2026, so nothing is spent.
 
+Or choose **Your own file** and upload a bank statement or a list of bills as your bank or accounts software exports it (Excel, CSV or text). SettleBot finds the table and the columns itself, without AI, and shows what it read before anything runs; any column it got wrong can be changed from a dropdown. [More below](#reading-any-export).
+
 **Host your own public demo** on Render's free plan (no keys needed; it starts with two finished example runs):
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/INV777/Settlebot)
@@ -65,6 +67,16 @@ A JSON array of bank lines and invoices. A line without `invoice_no` or `vendor_
 ]
 ```
 
+<a id="reading-any-export"></a>**Or any export, as it comes.** The console (and `settlebot/importer.py`) reads a bank statement or a list of bills straight from the bank or the accounts software: `.xlsx`, old `.xls`, the HTML pages some banks save as `.xls`, and CSV or text with any delimiter or encoding. Everything is offline rules, with no network and no AI, so reading a file costs nothing.
+
+- **Finds the table:** skips the account details above it and the totals below it, picks the right sheet, and works without column names.
+- **Finds the columns:** from common headings ("Withdrawal Amt.", "Narration", "Dr/Cr", "Bill No", "Supplier"), and when there are none, from the numbers themselves: the column the balance moves by is the amount.
+- **Cleans the values:** Indian amounts (`1,18,500.00`, `500.00 Dr`, `(860.50)`), dates in any common format, with day-first or month-first worked out from the file.
+- **Keeps only what it should check:** money going out. Money coming in and opening, closing and total rows are left out and listed.
+- **Shows its reading first:** a preview of each line with its row number in the file, and a dropdown for every column, the sheet, the header row, the date order and how money out is shown. A run can't start while a needed column is missing.
+
+![What SettleBot read from a bank statement exported as old Excel: 5 payments going out under column names on row 7, with a dropdown for each column](docs/screenshots/import-preview.png)
+
 ### Output
 
 `out/<run-id>/report.json` gives one row per line, and the same table prints to the terminal.
@@ -91,9 +103,9 @@ Each fact cites the source, the URL, the exact field or passage, the record date
 
 ### Evaluation suite
 
-[`evals/cases.yaml`](evals/cases.yaml) holds 32 hard cases (46 lines), each with the answer a careful AP clerk would give: processor prefixes, double charges and monthly repeats, zero-padded and re-sent invoices, new bank accounts, lookalike names (swapped letters, `1` for `i`, Cyrillic letters, another legal form), lookalike sender domains, unknown vendors, limits, and the problem statement on real recorded Crustdata responses. `python scripts/eval.py` runs them through the real pipeline in about 1.5 s and scores **+1** for correct, **0** for an honest "cannot verify", and **−2** for anything else. An answer is **unsafe** when SettleBot says VERIFIED and the right answer was anything else. CI fails on any wrong or unsafe answer.
+[`evals/cases.yaml`](evals/cases.yaml) holds 40 hard cases (83 lines), each with the answer a careful AP clerk would give: processor prefixes, double charges and monthly repeats, zero-padded and re-sent invoices, new bank accounts, lookalike names (swapped letters, `1` for `i`, Cyrillic letters, another legal form), lookalike sender domains, unknown vendors, limits, the problem statement on real recorded Crustdata responses, and eight messy files to read (an old Excel statement with totals, a semicolon CSV in Windows encoding, a two-sheet workbook, an HTML page saved as `.xls`, a UTF-16 text export, a file with no column names, dates that could go either way, and a list of bills with a missing vendor ID). `python scripts/eval.py` runs them through the real pipeline in about 2 s and scores **+1** for correct, **0** for an honest "cannot verify", and **−2** for anything else. An answer is **unsafe** when SettleBot says VERIFIED and the right answer was anything else. CI fails on any wrong or unsafe answer.
 
-Current score: **45 of 46**, with no wrong or unsafe answers ([full results](evals/RESULTS.md)). The one miss is a documented limit: a city that `descriptor.city_tokens` doesn't list stays in the merchant name, so the line is held rather than guessed.
+Current score: **82 of 83**, with no wrong or unsafe answers ([full results](evals/RESULTS.md)). The one miss is a documented limit: a city that `descriptor.city_tokens` doesn't list stays in the merchant name, so the line is held rather than guessed.
 
 The suite earned its place on its first run: it found a re-sent invoice with a changed amount that was VERIFIED and payable (now held), and a missing "same vendor under a new ID" note (now given).
 
@@ -122,6 +134,7 @@ The suite earned its place on its first run: it found a re-sent invoice with a c
 - **Replay mode** (`--replay`). Reruns real recorded Crustdata responses with no key and no network. Ledger rows say `crustdata-replay` at ₹0, citations keep the original fetch time, and the report estimates what the same calls cost live. `scripts/export_cassette.py` turns any live run into a replay.
 - **Fixed: a second run could pay for the same call twice after a crash.** Stored responses were keyed without the run, so a second run with an identical response lost its cache row, and a crash in that run would have repeated the call. Keys now include the run; the regression test fails on the old code.
 - **Evaluation suite** with a score in CI ([above](#evaluation-suite)). Its first run found two problems, both fixed with regression tests: an invoice re-sent with the same number and a **different amount** was VERIFIED and payable (it is now held for a person, with both amounts in the reason), and an invoice under a new vendor ID with a known vendor's exact name was held without saying so (names are now compared without any legal form).
+- **Reads any bank or accounts export, for ₹0.** Upload a statement or a list of bills as it comes, preview what was read, fix any column from a dropdown, then run ([how it reads a file](#reading-any-export)). Offline rules only, no AI. Eight invented messy files are scored in CI. In the public demo, runs from your own file open only in the browser that started them, are deleted after an hour, and the uploaded file is not kept once the run starts.
 - **Two approvers from ₹1,00,000.** A second `PAY` rule in `config.yaml`; the comment there now matches the code (the highest matching threshold decides).
 
 **Still open**
@@ -231,6 +244,7 @@ Six steps, each checkpointed:
 - Nothing irreversible happens without a person. Each pending action shows a **decision card** with the payee, masked bank details, the plain-English reason and the sources. Decisions are stored with approver, time and reason, and survive restarts.
 - Approval rules are in config, for example `{action: PAY, min_amount_inr: 100000, approvers: 2}`. The same person approving twice counts once.
 - A `HELD_FRAUD` line never gets a payment action. The fix is to confirm the change with the vendor through a contact on file, never through the invoice.
+- Uploaded files are read in memory and kept only until the run starts; then only the extracted lines remain. Previews show account and card numbers with only the last 4 digits.
 - `pii_guard` masks PAN, Aadhaar, phone numbers, email, IFSC, UPI IDs and account numbers before any text goes to Claude. Account numbers in reasons and cards show only the last 4 digits.
 
 ### Cost and limits
@@ -265,7 +279,7 @@ python main.py console --demo              # public demo: replay and fixtures on
 
 Runs and their database live in `console_data/` (git-ignored). Payments go to a simulated provider unless the run is live and Razorpay test keys are set.
 
-**Public demo on Render:** `render.yaml` describes one free web service that runs `python main.py console --demo` on Python 3.12 (`.python-version`). Demo mode allows only recorded and fixture data, pays a simulated provider, caps uploads at 50 lines and three workers at a time, and starts with one finished run of each sample. Free instances sleep after 15 idle minutes and take about a minute to wake, and the disk is temporary, so runs are cleared whenever the instance restarts.
+**Public demo on Render:** `render.yaml` describes one free web service that runs `python main.py console --demo` on Python 3.12 (`.python-version`). Demo mode allows only recorded and fixture data, pays a simulated provider, takes files up to 2 MB and 300 lines, runs three workers at a time, and starts with one finished run of each sample. **It cannot spend money:** workers start with every API key blanked (so even a `.env` file can't supply one), with `--no-llm`, and with replay or fixture data only; a test checks this with keys set. Runs from a visitor's own file open only in that browser (a random id kept in its local storage) and are deleted, database rows included, after an hour. Free instances sleep after 15 idle minutes and take about a minute to wake, and the disk is temporary, so runs are cleared whenever the instance restarts.
 
 **Quickstart (command line):**
 
@@ -321,10 +335,13 @@ settlebot/
   approvals.py          rules, decision cards
   payments.py           Razorpay Orders (test) and reconcile-before-retry
   ledger.py, report.py, pii_guard.py, normalize.py, accounts.py
+  importer.py           reads raw bank and accounts exports (Excel, CSV, text) offline, no AI
   web/                  console: app.py (FastAPI API), workers.py (one process per run), static/ (page)
-tests/                  unit and console tests, recorded Crustdata responses, fixtures
+tests/                  unit and console tests, recorded Crustdata responses, fixtures,
+                        and fixtures/imports/ (invented messy exports the importer is scored on)
 evals/                  evaluation cases, fictional sources and vendor master, RESULTS.md
-scripts/                demo.py / demo.sh, kill_test.py, smoke_live.py, export_cassette.py, eval.py
+scripts/                demo.py / demo.sh, kill_test.py, smoke_live.py, export_cassette.py, eval.py,
+                        make_import_samples.py (rebuilds the messy test files)
 docs/screenshots/       console screenshots and the demo GIF
 architecture.mmd        system diagram
 data/vendor_master.json fictional placeholder until the client's records are in

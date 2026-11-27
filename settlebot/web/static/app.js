@@ -3,7 +3,8 @@
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const main = $("#main");
-const state = { info: null, timer: null, runId: null, lastJson: "", expanded: new Set(), stamps: new Map(), busy: false };
+const state = { info: null, timer: null, runId: null, lastJson: "", expanded: new Set(), stamps: new Map(), busy: false,
+  imp: null, impChoices: {}, impSeq: 0 };
 
 const inr = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const money = (n) => (n == null ? "–" : "₹" + inr.format(n));
@@ -33,8 +34,19 @@ function fmtWhen(d) {
   return d.length <= 10 ? fmtDate(d) : t.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+/* A random id kept in this browser. In the public demo, runs from your own file are shown only to it. */
+const OWNER = (() => {
+  const fresh = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  try {
+    let t = localStorage.getItem("settlebot.owner");
+    if (!t) { t = fresh(); localStorage.setItem("settlebot.owner", t); }
+    return t;
+  } catch { return fresh(); /* storage blocked: private to this tab instead */ }
+})();
+
 async function api(path, opts = {}) {
-  const r = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
+  const headers = { "content-type": "application/json", "x-settlebot-owner": OWNER, ...(opts.headers || {}) };
+  const r = await fetch(path, { ...opts, headers });
   let body = null;
   try { body = await r.json(); } catch { /* empty body */ }
   if (!r.ok) {
@@ -96,8 +108,12 @@ async function showHome() {
             <label class="choice"><input type="radio" name="batch" value="${esc(key)}" data-mode="${esc(s.mode)}" ${i === 0 ? "checked" : ""}>
               <strong>${esc(s.title)}</strong><span>${esc(s.about)}</span></label>`).join("")}
           <label class="choice"><input type="radio" name="batch" value="upload">
-            <strong>Your own batch</strong><span>A JSON list of bank lines or invoices, in the format shown in the README.
-            <input type="file" id="file" accept=".json,application/json" aria-label="Batch file"></span></label>
+            <strong>Your own file</strong><span>A bank statement or a list of bills, exactly as your bank or accounts
+            software exports it: Excel (.xlsx, .xls), CSV or text. SettleBot finds the table and the columns itself and
+            shows you what it read before anything runs.
+            <input type="file" id="file" accept=".xlsx,.xlsm,.xls,.csv,.tsv,.txt,.json" aria-label="Your file"></span></label>
+          ${(info.sample_files || []).length ? `<p class="small muted samples">No file to hand? Download one to try:
+            ${info.sample_files.map((f) => `<a href="/api/sample-files/${encodeURIComponent(f.name)}" download>${esc(f.title)}</a>`).join("; ")}.</p>` : ""}
         </fieldset>
         <fieldset>
           <legend>Data</legend>
@@ -108,13 +124,14 @@ async function showHome() {
         <label class="check"><input type="checkbox" id="slow" checked>
           <span>Slow motion: each lookup takes about a second, so you can crash the worker halfway through and watch it recover.</span></label>
         <p class="form-error" id="start-error" role="alert"></p>
-        <button class="primary" type="submit">Start run</button>
+        <button class="primary" type="submit" id="start-button">Start run</button>
       </form>
       <div>
         <h2 id="runs-title" style="margin-top:0">Recent runs</h2>
         <div id="runs"><p class="muted">Loading…</p></div>
       </div>
-    </section>`;
+    </section>
+    <section class="import" id="import" aria-labelledby="import-title" hidden></section>`;
   const form = $("#start");
   const pickMode = () => {
     const b = form.querySelector('input[name="batch"]:checked');
@@ -123,11 +140,187 @@ async function showHome() {
     if (r) r.checked = true;
     else if (!form.querySelector('input[name="mode"]:checked')) form.querySelector('input[name="mode"]:not(:disabled)').checked = true;
   };
-  form.addEventListener("change", (e) => { if (e.target.name === "batch") pickMode(); });
-  $("#file").addEventListener("change", () => { form.querySelector('input[value="upload"]').checked = true; });
+  form.addEventListener("change", (e) => { if (e.target.name === "batch") { pickMode(); startLabel(); } });
+  $("#file").addEventListener("change", () => {
+    form.querySelector('input[value="upload"]').checked = true;
+    pickMode();
+    const f = $("#file").files[0];
+    if (f && !/\.json$/i.test(f.name)) uploadFile(f);
+    else clearImport();
+  });
+  $("#import").addEventListener("change", changeImport);
   pickMode();
   form.addEventListener("submit", startRun);
+  state.imp = null;
+  state.impChoices = {};
   loadRuns();
+}
+
+/* ---- your own file: upload, show what was read, let the person correct it ---- */
+const KIND_NAMES = { bank_line: "A bank statement", invoice: "A list of bills" };
+const AMOUNT_MODES = { debit_column: "Separate money-out and money-in columns", drcr: "One amount column with a Dr/Cr marker",
+  signed: "One amount column, minus means money out", unsigned: "One amount column, all money out" };
+
+function clearImport() {
+  state.imp = null;
+  state.impChoices = {};
+  state.impSeq++;
+  const box = $("#import");
+  if (box) { box.hidden = true; box.innerHTML = ""; }
+  startLabel();
+}
+
+function startLabel() {
+  const btn = $("#start-button");
+  if (!btn) return;
+  const upload = document.querySelector('input[name="batch"][value="upload"]:checked');
+  const imp = upload && state.imp;
+  btn.textContent = imp && imp.line_count && !imp.problems.length ? `Start run with ${plural(imp.line_count, "line", "lines")}` : "Start run";
+  btn.disabled = Boolean(upload && $("#file").files[0] && !/\.json$/i.test($("#file").files[0].name) &&
+    (!imp || imp.problems.length || !imp.line_count));
+}
+
+async function uploadFile(f) {
+  clearImport();
+  const box = $("#import");
+  const seq = state.impSeq;
+  const maxMb = state.info.upload_max_mb || 2;
+  box.hidden = false;
+  if (f.size > maxMb * 1_000_000) {
+    box.innerHTML = `<h2 id="import-title">${esc(f.name)}</h2><p class="form-error">Files up to ${maxMb} MB can be read here.
+      This one is ${(f.size / 1_000_000).toFixed(1)} MB. Export a shorter date range and try again.</p>`;
+    return;
+  }
+  box.innerHTML = `<h2 id="import-title">Reading ${esc(f.name)}…</h2>`;
+  try {
+    const imp = await api(`/api/imports?filename=${encodeURIComponent(f.name)}`, {
+      method: "POST", body: f, headers: { "content-type": "application/octet-stream" } });
+    if (seq !== state.impSeq) return;
+    state.imp = imp;
+    renderImport();
+    $("#import-title").focus();
+  } catch (x) {
+    if (seq !== state.impSeq) return;
+    box.innerHTML = `<h2 id="import-title">${esc(f.name)}</h2><p class="form-error">${esc(x.message)}</p>`;
+  }
+  startLabel();
+}
+
+async function changeImport(e) {
+  const t = e.target, c = state.impChoices, imp = state.imp;
+  if (!imp || !t.name) return;
+  const resetColumns = () => { delete c.mapping; delete c.amount_mode; };
+  if (t.name === "kind") { c.kind = t.value; resetColumns(); }
+  else if (t.name === "sheet") { c.sheet = t.value; delete c.header_row; delete c.day_first; resetColumns(); }
+  else if (t.name === "header_row") {
+    const n = parseInt(t.value, 10);
+    if (isNaN(n) || n < 0) return;
+    c.header_row = n; resetColumns();
+  }
+  else if (t.name === "day_first") c.day_first = t.value === "1";
+  else if (t.name === "amount_mode") c.amount_mode = t.value;
+  else if (t.name.startsWith("map:")) c.mapping = { ...imp.mapping, [t.name.slice(4)]: t.value === "" ? null : Number(t.value) };
+  else return;
+  const seq = ++state.impSeq, focusId = t.id;
+  $("#import").setAttribute("aria-busy", "true");
+  try {
+    const next = await api(`/api/imports/${imp.import_id}/preview`, { method: "POST", body: JSON.stringify(c) });
+    if (seq !== state.impSeq) return;
+    state.imp = next;
+    renderImport();
+  } catch (x) {
+    if (seq !== state.impSeq) return;
+    renderImport(x.message);  // the last good reading stays on screen
+  }
+  const el = focusId && document.getElementById(focusId);
+  if (el) el.focus();
+  startLabel();
+}
+
+function importSummary(imp) {
+  const what = imp.kind === "invoice" ? plural(imp.line_count, "bill", "bills")
+    : plural(imp.line_count, "payment going out", "payments going out");
+  const where = imp.sheets.length > 1 ? ` on the sheet “${imp.sheet}”` : "";
+  const head = imp.header_row ? `, under the column names on row ${imp.header_row}` : ", in a table with no column names";
+  const left = Object.values(imp.skipped_by_reason || {}).reduce((a, b) => a + b, 0);
+  return `Found ${what}${where}${head}.${left ? ` ${plural(left, "other row was", "other rows were")} left out; they’re listed below.` : ""}`;
+}
+
+function columnOptions(imp, chosen) {
+  return `<option value="">Not in this file</option>` + imp.columns.map((col) =>
+    `<option value="${col.index}" ${chosen === col.index ? "selected" : ""}>${esc(col.letter)}: ${esc(col.header)}${col.sample && col.sample !== col.header ? ` (${esc(col.sample)})` : ""}</option>`).join("");
+}
+
+function previewTable(imp) {
+  const rows = imp.lines;
+  if (!rows.length) return `<p class="muted">No lines to show yet.</p>`;
+  const more = imp.line_count > rows.length ? ` Showing the first ${rows.length} of ${imp.line_count}.` : "";
+  if (imp.kind === "invoice") {
+    return `<table class="ledger preview">
+      <caption>How each bill will be read.${more}</caption>
+      <thead><tr><th scope="col">Row</th><th scope="col">Invoice</th><th scope="col">Vendor</th><th scope="col">Date</th>
+        <th scope="col" class="num">Amount</th><th scope="col">Pay to</th></tr></thead>
+      <tbody>${rows.map((l) => `<tr><td class="line-no">${l.source.row}</td><td>${esc(l.invoice_no || "–")}</td>
+        <td>${esc(l.description || "")}${l.vendor_id ? `<br><span class="small muted">${esc(l.vendor_id)}</span>` : `<br><span class="small muted">No vendor ID</span>`}</td>
+        <td>${esc(fmtDate(l.date))}</td><td class="num">${money(l.amount_inr)}</td>
+        <td class="small">${l.bank_account ? `${esc(l.bank_account.account || "")}${l.bank_account.ifsc ? `, ${esc(l.bank_account.ifsc)}` : ""}` : "–"}</td></tr>`).join("")}</tbody>
+    </table>`;
+  }
+  return `<table class="ledger preview">
+    <caption>How each line will be read. Only money going out is checked.${more}</caption>
+    <thead><tr><th scope="col">Row</th><th scope="col">Date</th><th scope="col">Description</th>
+      <th scope="col" class="num">Amount out</th><th scope="col">Reference</th></tr></thead>
+    <tbody>${rows.map((l) => `<tr><td class="line-no">${l.source.row}</td><td>${esc(fmtDate(l.date))}</td>
+      <td class="desc">${esc(l.description)}</td><td class="num">${money(l.amount_inr)}</td>
+      <td class="small">${esc(l.reference || "")}</td></tr>`).join("")}</tbody>
+  </table>`;
+}
+
+function renderImport(error) {
+  const imp = state.imp, box = $("#import");
+  const id = (s) => `imp-${s}`;
+  const sel = (name, label, options, hint = "") => `<label class="field" for="${id(name)}"><span>${esc(label)}</span>
+    <select id="${id(name)}" name="${name}">${options}</select>${hint ? `<small>${hint}</small>` : ""}</label>`;
+  const opts = (pairs, current) => pairs.map(([v, t]) => `<option value="${esc(v)}" ${String(current) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("");
+  const skipped = imp.skipped || [];
+  const skippedTotal = Object.values(imp.skipped_by_reason || {}).reduce((a, b) => a + b, 0);
+  box.hidden = false;
+  box.removeAttribute("aria-busy");
+  box.innerHTML = `
+    <h2 id="import-title" tabindex="-1">What SettleBot read from ${esc(imp.filename)}</h2>
+    <p class="import-summary">${esc(importSummary(imp))}</p>
+    ${imp.notes.length ? `<ul class="import-notes">${imp.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+    ${imp.problems.length ? `<div class="import-problems" role="alert"><p><strong>Before this can run:</strong></p>
+      <ul>${imp.problems.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></div>` : ""}
+    ${error ? `<p class="form-error" role="alert">${esc(error)}</p>` : ""}
+    <div class="import-grid">
+      <div>
+        <h3>The file</h3>
+        <div class="fields">
+          ${sel("kind", "This file is", opts(Object.entries(KIND_NAMES), imp.kind))}
+          ${imp.sheets.length > 1 ? sel("sheet", "Sheet", opts(imp.sheets.map((s) => [s.name, `${s.name} (${plural(s.rows, "row", "rows")})`]), imp.sheet)) : ""}
+          <label class="field" for="${id("header_row")}"><span>Column names are on row</span>
+            <input type="number" id="${id("header_row")}" name="header_row" min="0" step="1" inputmode="numeric" value="${imp.header_row ?? 0}">
+            <small>0 if the table has no column names.</small></label>
+          ${imp.mapping.date != null ? sel("day_first", "A date like 03/04 means", opts([["1", "3 April"], ["0", "March 4"]], imp.day_first ? "1" : "0"),
+            imp.day_first_certain ? "" : "Every date here could be read either way. Check one you know.") : ""}
+          ${imp.kind === "bank_line" ? sel("amount_mode", "Money going out is shown as", opts(Object.entries(AMOUNT_MODES), imp.amount_mode)) : ""}
+        </div>
+      </div>
+      <div>
+        <h3>Columns</h3>
+        <div class="fields fields--map">
+          ${imp.fields.map((f) => sel(`map:${f.field}`, f.label, columnOptions(imp, imp.mapping[f.field]))).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="scroll">${previewTable(imp)}</div>
+    ${skipped.length ? `<details class="skipped"><summary>Rows left out (${skippedTotal})${skippedTotal > skipped.length ? `, first ${skipped.length} shown` : ""}</summary>
+      <ul>${skipped.map((r) => `<li><span class="line-no">Row ${r.row}</span> ${esc(r.reason)}${r.text ? `: <span class="muted">${esc(r.text)}</span>` : ""}</li>`).join("")}</ul></details>` : ""}
+    ${state.info.demo ? `<p class="small muted import-demo">In this demo nothing is looked up live, because live lookups cost money.
+      Lines that aren’t in the recorded responses will come back as “cannot verify”: that is SettleBot refusing to guess.
+      Runs from your file can be opened only in this browser and are deleted after ${(state.info.private_hours || 1) === 1 ? "an hour" : `${state.info.private_hours} hours`}.</p>` : ""}
+    <p><button class="primary" type="submit" form="start" ${imp.problems.length || !imp.line_count ? "disabled" : ""}>${imp.problems.length || !imp.line_count ? "Start run" : `Start run with ${plural(imp.line_count, "line", "lines")}`}</button></p>`;
 }
 
 async function startRun(e) {
@@ -139,9 +332,14 @@ async function startRun(e) {
   const batch = form.querySelector('input[name="batch"]:checked').value;
   const mode = form.querySelector('input[name="mode"]:checked').value;
   const body = { mode, slow: $("#slow").checked };
-  if (batch === "upload") {
-    const f = $("#file").files[0];
-    if (!f) { err.textContent = "Choose a JSON file for your batch, or pick one of the samples."; return; }
+  const f = $("#file").files[0];
+  if (batch === "upload" && f && !/\.json$/i.test(f.name)) {
+    if (!state.imp) { err.textContent = "SettleBot couldn’t read that file. Choose another, or pick one of the samples."; return; }
+    if (state.imp.problems.length) { err.textContent = "Fix the choices under “What SettleBot read” first."; return; }
+    body.import_id = state.imp.import_id;
+    body.choices = state.impChoices;
+  } else if (batch === "upload") {
+    if (!f) { err.textContent = "Choose a file, or pick one of the samples."; return; }
     try {
       const data = JSON.parse(await f.text());
       body.lines = Array.isArray(data) ? data : (data.lines || data.items || data.bank_lines || data.invoices);
@@ -195,7 +393,7 @@ async function loadRuns() {
           <thead><tr><th scope="col">Started</th><th scope="col">Batch</th><th scope="col">Result</th><th scope="col">Worker</th></tr></thead>
           <tbody>${runs.map((r) => `
             <tr><td>${esc(fmtWhen(r.created_at))}</td>
-              <td><a href="#/run/${esc(r.run_id)}">${esc(r.label)}</a><br><span class="small muted">${esc(MODE_NAMES[r.mode])}, ${plural(r.lines, "line", "lines")}</span></td>
+              <td><a href="#/run/${esc(r.run_id)}">${esc(r.label)}</a><br><span class="small muted">${esc(MODE_NAMES[r.mode])}, ${plural(r.lines, "line", "lines")}${r.private ? ", only in this browser" : ""}</span></td>
               <td class="small">${esc(countsText(r.counts))}</td>
               <td class="small">${esc(workerText(r))}</td></tr>`).join("")}</tbody>
         </table>` : `<p class="muted">No runs yet. Start one with a sample batch: it takes a few seconds.</p>`;
@@ -341,6 +539,9 @@ function renderRun(data) {
     <p><a class="back" href="#/">All runs</a></p>
     <div class="run-head"><h1>${esc(m.label)}</h1><span class="small muted">Run ${esc(m.run_id)}</span></div>
     <p class="mode"><strong>${esc(MODE_NAMES[m.mode])}.</strong> ${esc(modeAbout)}${m.slow ? " Slow motion is on." : ""}</p>
+    ${m.source ? `<p class="mode">Read from ${esc(m.source.file)}${m.source.sheet && m.source.sheet !== m.source.file ? `, sheet “${esc(m.source.sheet)}”` : ""}${m.source.header_row ? `, column names on row ${m.source.header_row}` : ""}.
+      ${m.source.money_in_left_out ? `${plural(m.source.money_in_left_out, "incoming payment was", "incoming payments were")} left out. ` : ""}The uploaded file itself was not kept.</p>` : ""}
+    ${m.private ? `<p class="mode">Only this browser can open this run. It will be deleted at ${esc(new Date(m.deleted_after_ts * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }))}.</p>` : ""}
     ${workerHtml(data)}
     ${t ? `<ul class="tally">
       <li><b>${lines.length}</b>lines</li>
